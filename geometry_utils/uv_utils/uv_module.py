@@ -162,3 +162,19 @@ def vert_attr_to_uv(vert_attrs, vert_index_map, bary_coords_map, uv_mask):
     vert_attr_map = torch.zeros((B, H, W, C), dtype=vert_attrs.dtype, device=vert_attrs.device)
     vert_attr_map[:, uv_mask] = maskindexed_vert_attrs_barysummed
     return vert_attr_map
+
+def face_attr_to_uv(face_attrs, face_index_map, uv_mask):
+    """
+    face_attrs: [B, N, C]
+    face_index_map: [H, W, 3]
+    uv_mask: [H, W]
+    """
+    B, _, C = face_attrs.shape
+    H, W = uv_mask.shape
+
+    maskindexed_face_index_map = face_index_map[uv_mask]    # [Np,]
+    maskindexed_face_attrs = face_attrs[:, maskindexed_face_index_map]  # [B, Np, C]
+
+    face_attr_map = torch.zeros((B, H, W, C), dtype=face_attrs.dtype, device=face_attrs.device)
+    face_attr_map[:, uv_mask] = maskindexed_face_attrs
+    return face_attr_map    # [H, W, C]
