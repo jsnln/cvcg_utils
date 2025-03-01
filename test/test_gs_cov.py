@@ -6,7 +6,7 @@ import numpy as np
 import math
 from tqdm import trange
 
-from geometry_utils import UnifiedCamera, render_gs, write_video
+from cvcg_utils import UnifiedCamera, render_gs, write_video
 
 def strip_lowerdiag(L):
     uncertainty = torch.zeros((L.shape[0], 6), dtype=torch.float, device="cuda")

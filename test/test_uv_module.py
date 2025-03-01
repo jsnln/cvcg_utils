@@ -1,7 +1,7 @@
 import os
 os.environ['OPENCV_IO_ENABLE_OPENEXR']='1'
 
-from geometry_utils import read_ply, convert_edge_uv_to_uv_mesh, get_uv_assets, vert_attr_to_uv
+from cvcg_utils import read_ply, convert_edge_uv_to_uv_mesh, get_uv_assets, vert_attr_to_uv
 import numpy as np
 import torch
 import cv2

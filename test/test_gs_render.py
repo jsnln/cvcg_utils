@@ -2,7 +2,7 @@ import os
 import pickle
 import torch
 
-from geometry_utils import UnifiedCamera, render_gs, make_gs_rasterizer
+from cvcg_utils import UnifiedCamera, render_gs, make_gs_rasterizer
 
 def load_pickle(path):
     with open(path, 'rb') as file:

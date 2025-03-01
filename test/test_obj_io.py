@@ -1,5 +1,5 @@
 import numpy as np
-from geometry_utils import read_obj
+from cvcg_utils import read_obj
 
 if __name__ == '__main__':
     read_test  = True

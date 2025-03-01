@@ -2,8 +2,8 @@ import numpy as np
 import os
 import pickle
 import igl
-from geometry_utils import write_ply
-from geometry_utils import UnifiedCamera, DRTKCamera, render_drtk_face_attr, render_drtk_uv_textured
+from cvcg_utils import write_ply
+from cvcg_utils import UnifiedCamera, DRTKCamera, render_drtk_face_attr, render_drtk_uv_textured
 import drtk
 import torch as th
 from torchvision.utils import save_image

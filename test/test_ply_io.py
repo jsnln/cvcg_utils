@@ -1,5 +1,5 @@
 import numpy as np
-from geometry_utils import write_ply, read_ply
+from cvcg_utils import write_ply, read_ply
 
 if __name__ == '__main__':
     write_test = True

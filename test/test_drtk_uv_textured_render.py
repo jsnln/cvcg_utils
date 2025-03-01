@@ -2,8 +2,8 @@ import os
 import cv2
 import numpy as np
 import torch
-from geometry_utils import UnifiedCamera
-from geometry_utils import render_drtk_uv_textured
+from cvcg_utils import UnifiedCamera
+from cvcg_utils import render_drtk_uv_textured
 
 def load_pickle(path):
     import pickle

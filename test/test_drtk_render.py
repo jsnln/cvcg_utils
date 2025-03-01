@@ -3,8 +3,8 @@ import os
 import pickle
 import igl
 import torch
-from geometry_utils import write_ply
-from geometry_utils import UnifiedCamera, DRTKCamera, render_drtk_face_attr
+from cvcg_utils import write_ply
+from cvcg_utils import UnifiedCamera, DRTKCamera, render_drtk_face_attr
 
 def load_pickle(path):
     with open(path, 'rb') as file:
