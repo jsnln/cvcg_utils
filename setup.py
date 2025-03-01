@@ -10,7 +10,7 @@ setup(
               'cvcg_utils.image_io',
               'cvcg_utils.video_io',
               'cvcg_utils.pickle_io',
-              'cvcg_utils.mesh_proc',
+              'cvcg_utils.mesh',
               'cvcg_utils.pcd_proc',
               'cvcg_utils.render_utils',
               'cvcg_utils.uv_utils',
