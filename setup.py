@@ -14,6 +14,7 @@ setup(
               'cvcg_utils.pcd_proc',
               'cvcg_utils.render_utils',
               'cvcg_utils.uv_utils',
+              'cvcg_utils.tensor_utils',
               'cvcg_utils.external.nvdiffrecmc.render',
               'cvcg_utils.external.nvdiffrecmc.render.renderutils',
               'cvcg_utils.external.nvdiffrecmc.render.optixutils',
