@@ -2,6 +2,11 @@ import os
 import numpy as np
 import cv2
 
+def read_rgb(fn):
+    img = cv2.imread(fn, cv2.IMREAD_UNCHANGED)
+    assert len(img.shape) == 3
+    assert img.shape[-1] == 3
+    return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
 def write_rgb_exr(fn: str, rgb: np.ndarray):
     assert rgb.dtype == np.float32
@@ -21,6 +26,13 @@ def write_rgb(fn: str, rgb: np.ndarray):
     bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
     cv2.imwrite(fn, bgr)
 
+def write_bgr(fn: str, bgr: np.ndarray):
+    assert bgr.dtype == np.uint8
+    assert len(bgr.shape) == 3
+    assert bgr.shape[2] == 3
+    assert os.path.splitext(fn)[-1] in ['.png', '.jpg', '.jpeg']
+
+    cv2.imwrite(fn, bgr)
 
 def write_grayscale(fn: str, grayscale: np.ndarray):
     assert grayscale.dtype == np.uint8

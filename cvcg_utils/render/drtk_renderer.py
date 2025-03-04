@@ -6,7 +6,7 @@ import drtk.interpolate_ext
 import torch
 from typing import Callable
 from torchvision.utils import save_image  # to save images
-from ..mesh_proc.mesh_proc import get_vert_normals, get_face_normals
+from ..mesh.mesh_proc import get_vert_normals, get_face_normals
 from .camera import DRTKCamera
 
 def render_drtk_face_attr(
@@ -41,7 +41,7 @@ def render_drtk_face_attr(
 
     out_img = face_attr_img + bg_img
 
-    return out_img
+    return out_img, mask, face_index_img
 
 
 def render_drtk_vert_attr(
@@ -90,7 +90,7 @@ def render_drtk_vert_attr(
             vert_attr_img, # rendered image
             face_index_img)  # face indices
 
-    return vert_attr_img
+    return vert_attr_img, mask, face_index_img
 
 
 def render_drtk_shaded(

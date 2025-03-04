@@ -1,6 +1,6 @@
 import numpy as np
 import cv2
-from cvcg_utils.mesh.mesh_io import read_obj, write_obj, read_ply, write_ply
+from cvcg_utils.mesh import read_obj, write_obj, read_ply, write_ply
 
 if __name__ == '__main__':
     mesh = read_obj('bunny_with_uv.obj')

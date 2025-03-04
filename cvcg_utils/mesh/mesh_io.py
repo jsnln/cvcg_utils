@@ -3,8 +3,7 @@ import igl
 import plyfile
 import numpy as np
 from dataclasses import dataclass
-from ..image_io.image_io import write_rgb
-
+from ..misc.image_io import write_rgb
 
 @dataclass
 class MeshData:

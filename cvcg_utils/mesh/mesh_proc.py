@@ -141,8 +141,6 @@ def get_laplacian(n_verts: int, faces: torch.Tensor, dtype=torch.float) -> torch
 
     return L
 
-
-
 def get_mesh_eigenfunctions(verts, faces, k):
     L = -igl.cotmatrix(verts, faces)
     M = igl.massmatrix(verts, faces, igl.MASSMATRIX_TYPE_VORONOI)
