@@ -17,6 +17,14 @@ def write_rgb_exr(fn: str, rgb: np.ndarray):
     bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
     cv2.imwrite(fn, bgr)
 
+
+def read_rgb_exr(fn):
+    assert os.path.splitext(fn)[-1] in ['.exr']
+    img = cv2.imread(fn, cv2.IMREAD_UNCHANGED)
+    assert len(img.shape) == 3
+    assert img.shape[-1] == 3
+    return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
 def write_rgb(fn: str, rgb: np.ndarray):
     assert rgb.dtype == np.uint8
     assert len(rgb.shape) == 3
