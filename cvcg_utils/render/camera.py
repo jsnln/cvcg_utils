@@ -352,6 +352,14 @@ class UnifiedCamera:
         H = int(self.H * s_x)
         W = int(self.W * s_y)
         return UnifiedCamera(K, self.R.copy(), self.T.copy(), H, W)
+    
+    def crop(self, x_crop_low: int, y_crop_low: int, new_H: int, new_W: int):
+        K = self.K.copy()
+        K[0, 2] = self.K[0, 2] - x_crop_low
+        K[1, 2] = self.K[1, 2] - y_crop_low
+        H = new_H
+        W = new_W
+        return UnifiedCamera(K, self.R.copy(), self.T.copy(), H, W)
 
     @property
     def front(self):
