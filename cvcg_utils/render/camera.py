@@ -1,4 +1,4 @@
-from typing import Self
+from typing import Self, List
 import cv2
 import math
 import numpy as np
@@ -68,13 +68,64 @@ def opencv_intrinsics_to_opengl_projection(znear, zfar, K=None, img_h=None, img_
 class DRTKCamera(torch.nn.Module):
     def __init__(self, proj_mat, w2c_mat, H, W):
         """
-        full_proj_matrix: composite of projection and world2view
+        proj and w2c follows OpenGL convention
         """
         super().__init__()
         self.proj_mat = torch.nn.Buffer(torch.from_numpy(proj_mat))  # [H, W]
         self.w2c_mat = torch.nn.Buffer(torch.from_numpy(w2c_mat))  # [H, W]
         self.H = H
         self.W = W
+
+    def proj_points_to_camera(self, pts: torch.Tensor):
+        """
+        pts: [B, N, 3]
+
+        out: camera space coordinates
+        """
+        assert len(pts.shape) == 3
+        assert pts.shape[2] == 3
+
+        # full projection
+        pts_wld_homog = torch.nn.functional.pad(pts, (0,1), mode='constant', value=1)
+        pts_cam_homog = torch.einsum('yx,bnx->bny', self.w2c_mat, pts_wld_homog)
+        
+        pts_cam_x, pts_cam_y, pts_cam_z, _ = pts_cam_homog.unbind(dim=-1)
+        pts_cam = torch.stack([pts_cam_x, pts_cam_y, pts_cam_z], dim=-1)
+
+        return pts_cam
+
+    
+    def unproj_depth_image(self, depth_img: torch.Tensor):
+        """
+        depth_img: [B, H, W]
+
+        out_img: [B, 3, H, W]
+        """
+        assert len(depth_img.shape) == 3
+
+        batch_size = depth_img.shape[0]
+
+        # OpenGL convention NDC coords
+        clip_x_axis = torch.linspace(-1., 1., self.W, dtype=depth_img.dtype, device=depth_img.device)
+        clip_y_axis = torch.linspace(1., -1., self.H, dtype=depth_img.dtype, device=depth_img.device)
+
+        clip_xy_img = torch.stack([clip_x_axis[None, :].expand(self.H, -1),
+                                   clip_y_axis[:, None].expand(-1, self.W)],
+                                   dim=0)[None].expand(batch_size, -1, -1, -1)
+        
+        clip_x_img, clip_y_img = clip_xy_img.unbind(dim=1)   # [B, H, W]
+
+        cam_z_img = - depth_img
+        cam_x_img = ((-clip_x_img) - self.proj_mat[0,2]) * cam_z_img / (self.proj_mat[0,0])
+        cam_y_img = ((-clip_y_img) - self.proj_mat[1,2]) * cam_z_img / (self.proj_mat[1,1])
+
+        cam_xyz_img = torch.stack([cam_x_img, cam_y_img, cam_z_img], dim=1)
+        
+        world_xyz_img = torch.einsum('ji,bjhw->bihw', self.w2c_mat[:3, :3], cam_xyz_img - self.w2c_mat[:3, 3][None, :, None, None])
+        
+        return cam_xyz_img, world_xyz_img
+
+
 
     def proj_points_to_drtk_screen(self, pts: torch.Tensor, detach_z: bool):
         """
@@ -90,6 +141,7 @@ class DRTKCamera(torch.nn.Module):
         pts_cam_homog = torch.einsum('yx,bnx->bny', self.w2c_mat, pts_wld_homog)
         
         if not detach_z:
+            pts_cam_x, pts_cam_y, pts_cam_z, _ = pts_cam_homog.unbind(dim=-1)
             pts_clip_homog = torch.einsum('yx,bnx->bny', self.proj_mat,  pts_cam_homog)
             pts_clip = pts_clip_homog[..., :3] / pts_clip_homog[..., [3]]
         else:
@@ -103,7 +155,8 @@ class DRTKCamera(torch.nn.Module):
         # clip space (OpenGL) to screen space (DRTK)
         pts_x_screen = (pts_clip[..., 0] + 1) / 2 * self.W - 0.5
         pts_y_screen = (1 - pts_clip[..., 1]) / 2 * self.H - 0.5
-        pts_z_screen = pts_clip[..., 2]   # TODO, DRTK document says this should be the actual z coords, change later
+        # pts_z_screen = pts_clip[..., 2]   # TODO, DRTK document says this should be the actual z coords, change later
+        pts_z_screen = -pts_cam_z
 
         pts_screen = torch.stack([pts_x_screen,
                                   pts_y_screen,
@@ -197,6 +250,67 @@ class DRTKCamera(torch.nn.Module):
         
         return pts_screen
 
+class BatchDRTKCamera(torch.nn.Module):
+    def __init__(self, cameras: List[DRTKCamera]):
+        """
+        proj and w2c follows OpenGL convention
+        """
+        super().__init__()
+
+        self.H = cameras[0].H
+        self.W = cameras[0].W
+
+        proj_mats = []
+        w2c_mats = []
+
+        for cam in cameras:
+            assert cam.H == self.H
+            assert cam.W == self.W
+
+            proj_mats.append(cam.proj_mat.clone())
+            w2c_mats.append(cam.w2c_mat.clone())
+
+        self.proj_mat = torch.nn.Buffer(torch.stack(proj_mats, dim=0))  # [B, 4, 4]
+        self.w2c_mat = torch.nn.Buffer(torch.stack(w2c_mats, dim=0))  # [B, 4, 4]
+
+    @property
+    def batch_size(self) -> int:
+        return self.proj_mat.shape[0]
+
+    def proj_points_to_drtk_screen(self, pts: torch.Tensor, detach_z: bool):
+        """
+        pts: [N, 3], unbatched points
+
+        out: [B, N, 3], batched DRTK screen space coordinates, (-0.5, -0.5) to (W-0.5, H-0.5)
+        """
+        assert len(pts.shape) == 2, "input points must be unbatched, since cameras are batched"
+        assert pts.shape[-1] == 3
+
+        # full projection
+        pts_wld_homog = torch.nn.functional.pad(pts, (0,1), mode='constant', value=1)       # [N, 4]
+        pts_cam_homog = torch.einsum('byx,nx->bny', self.w2c_mat, pts_wld_homog)    # [B, N, 4]
+        
+        if not detach_z:
+            pts_clip_homog = torch.einsum('byx,bnx->bny', self.proj_mat,  pts_cam_homog)    # [B, N, 4]
+            pts_clip = pts_clip_homog[..., :3] / pts_clip_homog[..., [3]]   # [B, N, 3]
+        else:
+            pts_cam_x, pts_cam_y, pts_cam_z, _ = pts_cam_homog.unbind(dim=-1)   # [B, N]
+            pts_cam_z_detached = pts_cam_z.detach()
+            pts_clip_x = -(self.proj_mat[:,0,0,None] * pts_cam_x / pts_cam_z_detached + self.proj_mat[:,0,2,None])  # [B, N]
+            pts_clip_y = -(self.proj_mat[:,1,1,None] * pts_cam_y / pts_cam_z_detached + self.proj_mat[:,1,2,None])
+            pts_clip_z = -(self.proj_mat[:,2,2,None] + self.proj_mat[:,2,3,None] / pts_cam_z_detached)
+            pts_clip = torch.stack([pts_clip_x, pts_clip_y, pts_clip_z], dim=-1)    # [B, N, 3]
+
+        # clip space (OpenGL) to screen space (DRTK)
+        pts_x_screen = (pts_clip[..., 0] + 1) / 2 * self.W - 0.5
+        pts_y_screen = (1 - pts_clip[..., 1]) / 2 * self.H - 0.5
+        pts_z_screen = pts_clip[..., 2]   # TODO, DRTK document says this should be the actual z coords, change later
+
+        pts_screen = torch.stack([pts_x_screen,
+                                  pts_y_screen,
+                                  pts_z_screen], dim=-1)    # [B, N, 3]
+        
+        return pts_screen
     
 
 class NvdiffrecmcCamera(torch.nn.Module):
@@ -231,6 +345,13 @@ class UnifiedCamera:
         w2c[:3, 3] = self.T
         self.c2w = np.linalg.inv(w2c)
         
+    def scale(self, s_x, s_y):
+        K = self.K.copy()
+        K[0] = self.K[0] * s_x
+        K[1] = self.K[1] * s_y
+        H = int(self.H * s_x)
+        W = int(self.W * s_y)
+        return UnifiedCamera(K, self.R.copy(), self.T.copy(), H, W)
 
     @property
     def front(self):
@@ -251,13 +372,14 @@ class UnifiedCamera:
         return np.einsum('ij,nj->ni', self.R, pts) + self.T
 
     @classmethod
-    def from_lookat(cls, center, lookat, up, fov_x, fov_y, K, H, W, name=None) -> Self:
+    def from_lookat(cls, center, lookat, up, fov_x, fov_y, fov_mode, K, H, W, name=None) -> Self:
         """
         Provide either (fov_x, fov_y) or K
 
         OpenCV convention w2c matrix
         priority: front > up > right
         """
+        
         
         # camera pose
         front = lookat - center
@@ -281,6 +403,14 @@ class UnifiedCamera:
             if fov_x is None or fov_y is None:
                 raise NotImplementedError("Proivde either (fov_x, fov_y) or K")
             else:
+                assert fov_mode in ['deg', 'rad'], f'param fov_mode must be either deg or rad, now it is {fov_mode}'
+
+                if fov_mode == 'deg':
+                    fov_x = fov_x / 180 * math.pi
+                    fov_y = fov_y / 180 * math.pi
+                else:
+                    pass
+                
                 f_x = W / (2 * math.tan(fov_x / 2))
                 f_y = H / (2 * math.tan(fov_y / 2))
                 c_x = W / 2
@@ -301,6 +431,14 @@ class UnifiedCamera:
         R = extr_mat_3x4[:, :3]
         T = extr_mat_3x4[:, 3]
         K = intr_mat_3x3
+        return cls(K, R, T, h, w, name)
+    
+    @classmethod
+    def from_avatarrex(cls, cam_dict, name=None) -> Self:
+        R = np.array(cam_dict['R']).reshape(3, 3)
+        T = np.array(cam_dict['T']).reshape(-1)
+        K = np.array(cam_dict['K']).reshape(3, 3)
+        w, h = cam_dict['imgSize']
         return cls(K, R, T, h, w, name)
 
     @classmethod

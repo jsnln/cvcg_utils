@@ -1,6 +1,7 @@
 
 import torch
-from diff_gaussian_rasterization import GaussianRasterizationSettings, GaussianRasterizer
+# from diff_gaussian_rasterization import GaussianRasterizationSettings, GaussianRasterizer
+from diff_gaussian_rasterization_debug import GaussianRasterizationSettings, GaussianRasterizer
 from .sh_utils import eval_sh
 
 def render_gs(camera,
@@ -16,7 +17,8 @@ def render_gs(camera,
            convert_SHs_python: bool = False,
            separate_sh = False,
            use_trained_exp=False,
-           clip_value=False
+           clip_value=False,
+           termi_depth_img=None
            ):
     """
     Render the scene. 
@@ -79,7 +81,8 @@ def render_gs(camera,
             opacities = opacity,
             scales = scales,
             rotations = rotations,
-            cov3D_precomp = cov3D_precomp)
+            cov3D_precomp = cov3D_precomp,
+            termi_depth_img = termi_depth_img)
     else:
         rendered_image, radii, depth_image = rasterizer(
             means3D = means3D,
@@ -89,7 +92,8 @@ def render_gs(camera,
             opacities = opacity,
             scales = scales,
             rotations = rotations,
-            cov3D_precomp = cov3D_precomp)
+            cov3D_precomp = cov3D_precomp,
+            termi_depth_img = termi_depth_img)
         
     # Apply exposure to rendered image (training only)
     # ????????????????

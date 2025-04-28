@@ -3,18 +3,19 @@ import igl
 import plyfile
 import numpy as np
 from dataclasses import dataclass
-from ..misc.image_io import write_rgb
+from ..misc.image import write_rgb
 
 @dataclass
 class MeshData:
     verts: np.ndarray = None
     faces: np.ndarray = None
-    uv_verts: np.ndarray = None
-    uv_faces: np.ndarray = None
+    uv_verts: np.ndarray = None     # compatible with vt coords in obj
+    uv_faces: np.ndarray = None     # compatible with obj
     v_normals: np.ndarray = None
     f_normals: np.ndarray = None
     v_colors: np.ndarray = None
     f_colors: np.ndarray = None
+    edge_uv: np.ndarray = None      # compatible with the `texcoords` field in ply
 
 ####################
 ##### obj file #####
@@ -115,7 +116,7 @@ def read_ply(fn):
         edge_uv = None
 
     # TODO add support for normals, colors, edge uv
-    mesh = MeshData(verts, faces, None, None, None, None, v_colors)
+    mesh = MeshData(verts, faces, None, None, None, None, v_colors, None, edge_uv)
     return mesh
 
 def write_ply(
@@ -124,8 +125,11 @@ def write_ply(
         f: np.ndarray = None,
         v_color: np.ndarray = None,
         f_color: np.ndarray = None,
+        v_normal: np.ndarray = None,
         v_quality: np.ndarray = None,
-        f_quality: np.ndarray = None):
+        f_quality: np.ndarray = None,
+        edge_uv: np.ndarray = None,
+        texture_img: np.ndarray = None):
 
     assert fn.endswith('.ply')
     assert len(v.shape) == 2
@@ -137,6 +141,10 @@ def write_ply(
         assert len(v_color.shape) == 2
         assert v_color.shape[1] in [3, 4]
         assert v_color.shape[0] == v.shape[0]
+    if v_normal is not None:
+        assert len(v_normal.shape) == 2
+        assert v_normal.shape[1] == 3
+        assert v_normal.shape[0] == v.shape[0]
     if v_quality is not None:
         assert len(v_quality.shape) == 1
         assert v_quality.shape[0] == v.shape[0]
@@ -147,6 +155,11 @@ def write_ply(
     if f_quality is not None:
         assert len(f_quality.shape) == 1
         assert f_quality.shape[0] == f.shape[0]
+    if edge_uv is not None:
+        assert len(edge_uv.shape) == 3
+        assert edge_uv.shape[0] == f.shape[0]
+        assert edge_uv.shape[1] == 3
+        assert edge_uv.shape[2] == 2
 
     # v dtype
     v_dtype = [('x', 'f4'), ('y', 'f4'), ('z', 'f4')]
@@ -157,6 +170,10 @@ def write_ply(
             v_dtype = v_dtype + [('red', 'u1'), ('green', 'u1'), ('blue', 'u1'), ('alpha', 'u1')]
         else:
             raise NotImplementedError
+
+    if v_normal is not None:
+        v_dtype = v_dtype + [('nx', 'f4'), ('ny', 'f4'), ('nz', 'f4')]
+
     if v_quality is not None:
         v_dtype = v_dtype + [('quality', 'f4')]
 
@@ -168,6 +185,9 @@ def write_ply(
             f_dtype = f_dtype + [('red', 'u1'), ('green', 'u1'), ('blue', 'u1')]
         if f_quality is not None:
             f_dtype = f_dtype + [('quality', 'f4')]
+        if edge_uv is not None:
+            f_dtype = f_dtype + [('texcoord', 'f4', (6,))]
+
     
     # v data
     v_list_of_tuples = []
@@ -175,11 +195,20 @@ def write_ply(
         v_tuple = tuple(v[vid].tolist())
         if v_color is not None:
             v_tuple = v_tuple + tuple(v_color[vid].tolist())
+        if v_normal is not None:
+            v_tuple = v_tuple + tuple(v_normal[vid].tolist())
         if v_quality is not None:
             v_tuple = v_tuple + (v_quality[vid],)
         v_list_of_tuples.append(v_tuple)
     v_data = np.array(v_list_of_tuples, dtype=v_dtype)
-    v_el = plyfile.PlyElement.describe(v_data, 'vertex')
+
+    if texture_img is not None:
+        tex_fn = os.path.basename(fn) + ".png"
+        comments = [f'TextureFile {tex_fn}']
+        write_rgb(os.path.join(os.path.dirname(fn), tex_fn), texture_img)
+    else:
+        comments = []
+    v_el = plyfile.PlyElement.describe(v_data, 'vertex', comments=comments)
     
     # f data
     if f is not None:
@@ -190,6 +219,8 @@ def write_ply(
                 f_tuple = f_tuple + tuple(f_color[fid].tolist())
             if f_quality is not None:
                 f_tuple = f_tuple + (f_quality[fid],)
+            if edge_uv is not None:
+                f_tuple = f_tuple + (edge_uv[fid].reshape(-1).tolist(),)
             f_list_of_tuples.append(f_tuple)
         f_data = np.array(f_list_of_tuples, dtype=f_dtype)
         f_el = plyfile.PlyElement.describe(f_data, 'face')

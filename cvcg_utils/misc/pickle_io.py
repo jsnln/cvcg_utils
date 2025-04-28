@@ -7,4 +7,4 @@ def load_pickle(path):
 def dump_pickle(path, data):
     import pickle
     with open(path, 'wb') as file:
-        pickle.dump(data)
+        pickle.dump(data, file)

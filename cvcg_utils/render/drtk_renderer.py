@@ -4,25 +4,39 @@ import numpy as np
 import drtk
 import drtk.interpolate_ext
 import torch
-from typing import Callable
+from typing import Callable, Union
 from torchvision.utils import save_image  # to save images
 from ..mesh.mesh_proc import get_vert_normals, get_face_normals
-from .camera import DRTKCamera
+from .camera import DRTKCamera, BatchDRTKCamera
 
 def render_drtk_face_attr(
-        camera: DRTKCamera,
+        camera: Union[DRTKCamera, BatchDRTKCamera],
         verts: torch.Tensor,
         faces: torch.Tensor,
         face_attrs: torch.Tensor,
         bg_attr: torch.Tensor):
     
     """
-    verts: batched [B, Nv, 3]
+    supports two batching modes: camera batching and vert batching
+
+    the function uses `isinstance(camera, DRTKCamera)` to determine which batching type to use
+
+    only one of `camera` and `verts` is allowed to be batched
+
+    camera: unbatched type DRTKCamera or batched type BatchDRTKCamera
+    verts: unbatched [Nv, 3], or batched [B, Nv, 3]
     faces: unbatched [Nf, 3], shared by items in the vertex batch
     face_attrs: unbatched [Nf, C], shared by items in the vertex batch
     bg_attr: [C], shared by items in the vertex batch
     """
-    assert len(verts.shape) == 3
+
+    if isinstance(camera, DRTKCamera):
+        assert len(verts.shape) == 3
+    elif isinstance(camera, BatchDRTKCamera):
+        assert len(verts.shape) == 2
+    else:
+        raise NotImplementedError
+
     assert len(faces.shape) == 2
     assert len(face_attrs.shape) == 2
     assert faces.shape[0] == face_attrs.shape[0]
@@ -45,7 +59,7 @@ def render_drtk_face_attr(
 
 
 def render_drtk_vert_attr(
-        camera: DRTKCamera,
+        camera: Union[DRTKCamera, BatchDRTKCamera],
         verts: torch.Tensor,
         faces: torch.Tensor,
         vert_attrs: torch.Tensor,
@@ -54,21 +68,29 @@ def render_drtk_vert_attr(
     ):
     
     """
-    verts: batched [B, Nv, 3]
-    faces: unbatched [Nf, 3], shared by items in the vertex batch
+    similar to `render_drtk_face_attr`, supports two batching modes
 
-    vert_attrs: batched [B, Nv, C]
+    whether `vert_attrs` is batched should be consistent with `camera` and `verts`
+
     attr_faces: unbatched [Nf, 3]
 
     if verts and vert_attrs align, then attr_faces == faces,
-    but distinguishing allows other cases, e.g., uvs
+    but distinguishing them allows other cases, e.g., uvs
     """
-    assert len(verts.shape) == 3
+    if isinstance(camera, DRTKCamera):
+        assert len(verts.shape) == 3
+        assert len(vert_attrs.shape) == 3
+        assert verts.shape[0] == vert_attrs.shape[0]
+    elif isinstance(camera, BatchDRTKCamera):
+        assert len(verts.shape) == 2
+        assert len(vert_attrs.shape) == 2
+        batch_size = camera.proj_mat.shape[0]
+        vert_attrs = vert_attrs[None].expand(batch_size, -1, -1)
+    else:
+        raise NotImplementedError
+
     assert len(faces.shape) == 2
-
-    assert len(vert_attrs.shape) == 3
     assert len(attr_faces.shape) == 2
-
     assert faces.shape[0] == attr_faces.shape[0]
 
     pts_screen = camera.proj_points_to_drtk_screen(verts, detach_z=False)  # [B, N, 3]
@@ -77,7 +99,7 @@ def render_drtk_vert_attr(
     mask = (face_index_img > -1)  # [B, H, W]
     # face_index_img[~mask] = 0 # NOTE you can't do this!!! otherwise there's no edge grad
     
-    _, bary_img = drtk.render(pts_screen, faces, face_index_img)    # [B, 3, H, W]
+    depth_img, bary_img = drtk.render(pts_screen, faces, face_index_img)    # [B, 3, H, W]
     vert_attr_img = drtk.interpolate(vert_attrs, attr_faces, face_index_img, bary_img)   # [B, 3, H, W]
 
     vert_attr_img = vert_attr_img * mask[:, None]
@@ -90,11 +112,11 @@ def render_drtk_vert_attr(
             vert_attr_img, # rendered image
             face_index_img)  # face indices
 
-    return vert_attr_img, mask, face_index_img
+    return vert_attr_img, depth_img, mask, face_index_img
 
 
 def render_drtk_shaded(
-        camera: DRTKCamera,
+        camera: Union[DRTKCamera, BatchDRTKCamera],
         verts: torch.Tensor,
         faces: torch.Tensor,
         shading_mode: str,  # either 'vert' or 'face'
@@ -111,7 +133,13 @@ def render_drtk_shaded(
     face_attrs: unbatched [Nf, C], shared by items in the vertex batch
     bg_attr: [C], shared by items in the vertex batch
     """
-    assert len(verts.shape) == 3
+    if isinstance(camera, DRTKCamera):
+        assert len(verts.shape) == 3
+    elif isinstance(camera, BatchDRTKCamera):
+        assert len(verts.shape) == 2
+    else:
+        raise NotImplementedError
+
     assert len(faces.shape) == 2
 
     pts_screen = camera.proj_points_to_drtk_screen(verts, detach_z=False)  # [B, N, 3]
@@ -151,76 +179,13 @@ def render_drtk_shaded(
 
     return shaded_img
 
-def get_batched_ao(verts: torch.Tensor, faces: torch.Tensor):
-    vert_normals = get_vert_normals(verts, faces, normalize=True)   # [B, Nv, 3]
-    # Compute ambient occlusion factor using embree
-    verts_np = verts.detach().cpu().numpy()
-    faces_np = faces.detach().cpu().numpy()
-    vert_normals_np = vert_normals.detach().cpu().numpy()
-
-    import time
-    time_s = time.time()
-    ao_list = []
-    for i in range(verts.shape[0]):
-        ao = 1 - igl.ambient_occlusion(verts_np[i], faces_np, verts_np[i], vert_normals_np[i], 500) # shape = [Nv,]
-        ao_list.append(ao)
-    time_e = time.time()
-    print(f'[LOG] ao: {time_e - time_s:.4e}')
-
-    batched_ao = np.stack(ao_list, axis=0)
-    batched_ao = torch.from_numpy(batched_ao).to(verts.dtype).to(verts.device)
-    return batched_ao
-
-
-def render_drtk_ao(
-        camera: DRTKCamera,
-        verts: torch.Tensor,
-        faces: torch.Tensor,
-    ) -> torch.Tensor:
-    
-    """
-    verts: batched [B, Nv, 3]
-    faces: unbatched [Nf, 3], shared by items in the vertex batch
-
-    shading_func: a callable that turns normals [..., 3] to rgb [..., 3]
-    
-    face_attrs: unbatched [Nf, C], shared by items in the vertex batch
-    bg_attr: [C], shared by items in the vertex batch
-    """
-    assert len(verts.shape) == 3
-    assert len(faces.shape) == 2
-
-    pts_screen = camera.proj_points_to_drtk_screen(verts, detach_z=False)  # [B, N, 3]
-
-    face_index_img = drtk.rasterize(pts_screen, faces, height=camera.H, width=camera.W)   # [B, H, W]
-    mask = (face_index_img > -1)  # [B, H, W]
-    # face_index_img[~mask] = 0 # NOTE you can't do this!!! otherwise there's no edge grad
-    
-    _, bary_img = drtk.render(pts_screen, faces, face_index_img)    # [B, 3, H, W]   
-
-
-    vert_ao = get_batched_ao(verts, faces)   # [B, Nv]
-    vert_ao_img = drtk.interpolate(vert_ao[..., None], faces, face_index_img, bary_img)   # [B, 1, H, W]
-    vert_ao_img = vert_ao_img * mask[:, None]
-
-    # if make_differentiable:
-    #     shaded_img = drtk.edge_grad_estimator(
-    #         pts_screen,     # verts for rasterization
-    #         faces,          # faces
-    #         bary_img,       # barys
-    #         shaded_img, # rendered image
-    #         face_index_img)  # face indices
-
-    return vert_ao_img
-
 def render_drtk_uv_textured(
-        camera: DRTKCamera,
+        camera: Union[DRTKCamera, BatchDRTKCamera],
         verts: torch.Tensor,
         faces: torch.Tensor,
         uv_verts: torch.Tensor,
         uv_faces: torch.Tensor,
         texture_img: torch.Tensor,
-        vert_ao: torch.Tensor,
         make_differentiable: bool = False,
         flip_v: bool = True,
     ):
@@ -235,11 +200,15 @@ def render_drtk_uv_textured(
     face_attrs: unbatched [Nf, C], shared by items in the vertex batch
     bg_attr: [C], shared by items in the vertex batch
     """
-    assert len(verts.shape) == 3
+    if isinstance(camera, DRTKCamera):
+        assert len(verts.shape) == 3
+    elif isinstance(camera, BatchDRTKCamera):
+        assert len(verts.shape) == 2
+    else:
+        raise NotImplementedError
+
     assert len(faces.shape) == 2
-    # assert len(face_attrs.shape) == 2
-    # assert faces.shape[0] == face_attrs.shape[0]
-    # assert face_attrs.shape[1] == bg_attr.shape[0]
+    assert len(uv_verts.shape) == 2
 
     if flip_v:
         uv_verts = torch.stack([uv_verts[..., 0], 1 - uv_verts[..., 1]], dim=-1)
@@ -251,12 +220,8 @@ def render_drtk_uv_textured(
     # face_index_img[~mask] = 0 # NOTE you can't do this!!! otherwise there's no edge grad
     
     _, bary_img = drtk.render(pts_screen, faces, face_index_img)    # [B, 3, H, W]    
-    uv_img = drtk.interpolate(uv_verts[None].expand(verts.shape[0], -1, -1), uv_faces, face_index_img, bary_img)    # [B, 2, H, W]
+    uv_img = drtk.interpolate(uv_verts[None].expand(pts_screen.shape[0], -1, -1), uv_faces, face_index_img, bary_img)    # [B, 2, H, W]
     
-    # with torch.no_grad():
-    #     if vert_ao is not None:
-    #         ao_img = drtk.interpolate(vert_ao, faces, face_index_img, bary_img)    # [B, 1, H, W]
-
     textured_render_img = torch.nn.functional.grid_sample(
         texture_img,
         (uv_img * 2 - 1).permute(0,2,3,1),
@@ -281,88 +246,74 @@ def render_drtk_uv_textured(
             face_index_img, # face indices
             ).squeeze(1)    # [B, H, W]
 
-    if vert_ao is not None:
-        raise NotImplementedError
-    #     textured_rgb_image = textured_render_img[:, :3]
-    #     textured_rgb_image_wao = textured_rgb_image * ao_img
-    #     textured_seg_image = textured_render_img[:, 3:]
-        
-
-    #     textured_render_img = torch.cat([textured_rgb_image_wao, textured_seg_image], dim=1)
-    #     return textured_render_img, textured_rgb_image, mask, ao_img
-    else:
-        return textured_render_img, mask, face_index_img
-
-
-def render_drtk_uv_textured_batched(
-        drtk_proj_mat_batched: torch.Tensor,
-        drtk_w2c_mat_batched: torch.Tensor,
-        H, W,
-        verts: torch.Tensor,
-        faces: torch.Tensor,
-        uv_verts: torch.Tensor,
-        uv_faces: torch.Tensor,
-        texture_img: torch.Tensor,
-        make_differentiable: bool = False,
-        flip_v: bool = True,
-    ):
-    
-    """
-    verts: unbatched [Nv, 3]
-    faces: unbatched [Nf, 3], shared by items in the vertex batch
-    uv_verts: unbatched [Nv, 3]
-    uv_faces: unbatched [Nf, 3], shared by items in the vertex batch
-    texture_img: [C, H, W]
-    
-    face_attrs: unbatched [Nf, C], shared by items in the vertex batch
-    bg_attr: [C], shared by items in the vertex batch
-    """
-    assert len(verts.shape) == 2
-    assert len(faces.shape) == 2
-    # assert len(face_attrs.shape) == 2
-    # assert faces.shape[0] == face_attrs.shape[0]
-    # assert face_attrs.shape[1] == bg_attr.shape[0]
-
-    if flip_v:
-        uv_verts = torch.stack([uv_verts[..., 0], 1 - uv_verts[..., 1]], dim=-1)
-
-    pts_screen = DRTKCamera.proj_points_to_drtk_screen_batched(
-        drtk_proj_mat_batched, drtk_w2c_mat_batched, H, W,
-        verts, detach_z=False)  # [B, N, 3]
-    batch_size = pts_screen.shape[0]
-
-    face_index_img = drtk.rasterize(pts_screen, faces, height=H, width=W)   # [B, H, W]
-    mask = (face_index_img > -1)  # [B, H, W]
-    # face_index_img[~mask] = 0 # NOTE you can't do this!!! otherwise there's no edge grad
-    
-    _, bary_img = drtk.render(pts_screen, faces, face_index_img)    # [B, 3, H, W]    
-    uv_img = drtk.interpolate(uv_verts[None].expand(batch_size, -1, -1), uv_faces, face_index_img, bary_img)    # [B, 2, H, W]
-    
-    textured_render_img = torch.nn.functional.grid_sample(
-        texture_img.unsqueeze(0).expand(batch_size, -1, -1, -1),
-        (uv_img * 2 - 1).permute(0,2,3,1),
-        align_corners=False,
-        padding_mode='border',
-    )   # [B, C, H, W]
-    textured_render_img = textured_render_img * mask[:, None]
-
-    if make_differentiable:
-        textured_render_img = drtk.edge_grad_estimator(
-            pts_screen,     # verts for rasterization
-            faces,          # faces
-            bary_img,       # barys
-            textured_render_img, # rendered image
-            face_index_img)  # face indices
-        
-        mask = drtk.edge_grad_estimator(
-            pts_screen,     # verts for rasterization
-            faces,          # faces
-            bary_img,       # barys
-            mask.float()[:, None],  # rendered image
-            face_index_img, # face indices
-            ).squeeze(1)    # [B, H, W]
-
     return textured_render_img, mask, face_index_img
+
+
+# def render_drtk_uv_textured_batched_cams(
+#         batched_cams: BatchDRTKCamera,
+#         verts: torch.Tensor,
+#         faces: torch.Tensor,
+#         uv_verts: torch.Tensor,
+#         uv_faces: torch.Tensor,
+#         texture_img: torch.Tensor,
+#         make_differentiable: bool = False,
+#         flip_v: bool = True,
+#     ):
+    
+#     """
+#     verts: unbatched [Nv, 3]
+#     faces: unbatched [Nf, 3], shared by items in the vertex batch
+#     uv_verts: unbatched [Nv, 3]
+#     uv_faces: unbatched [Nf, 3], shared by items in the vertex batch
+#     texture_img: [C, H, W]
+    
+#     face_attrs: unbatched [Nf, C], shared by items in the vertex batch
+#     bg_attr: [C], shared by items in the vertex batch
+#     """
+#     assert len(verts.shape) == 2
+#     assert len(faces.shape) == 2
+#     # assert len(face_attrs.shape) == 2
+#     # assert faces.shape[0] == face_attrs.shape[0]
+#     # assert face_attrs.shape[1] == bg_attr.shape[0]
+
+#     if flip_v:
+#         uv_verts = torch.stack([uv_verts[..., 0], 1 - uv_verts[..., 1]], dim=-1)
+
+#     pts_screen = batched_cams.proj_points_to_drtk_screen(verts, detach_z=False)  # [B, N, 3]
+#     batch_size = pts_screen.shape[0]
+
+#     face_index_img = drtk.rasterize(pts_screen, faces, height=batched_cams.H, width=batched_cams.W)   # [B, H, W]
+#     mask = (face_index_img > -1)  # [B, H, W]
+#     # face_index_img[~mask] = 0 # NOTE you can't do this!!! otherwise there's no edge grad
+    
+#     _, bary_img = drtk.render(pts_screen, faces, face_index_img)    # [B, 3, H, W]    
+#     uv_img = drtk.interpolate(uv_verts[None].expand(batch_size, -1, -1), uv_faces, face_index_img, bary_img)    # [B, 2, H, W]
+    
+#     textured_render_img = torch.nn.functional.grid_sample(
+#         texture_img.unsqueeze(0).expand(batch_size, -1, -1, -1),
+#         (uv_img * 2 - 1).permute(0,2,3,1),
+#         align_corners=False,
+#         padding_mode='border',
+#     )   # [B, C, H, W]
+#     textured_render_img = textured_render_img * mask[:, None]
+
+#     if make_differentiable:
+#         textured_render_img = drtk.edge_grad_estimator(
+#             pts_screen,     # verts for rasterization
+#             faces,          # faces
+#             bary_img,       # barys
+#             textured_render_img, # rendered image
+#             face_index_img)  # face indices
+        
+#         mask = drtk.edge_grad_estimator(
+#             pts_screen,     # verts for rasterization
+#             faces,          # faces
+#             bary_img,       # barys
+#             mask.float()[:, None],  # rendered image
+#             face_index_img, # face indices
+#             ).squeeze(1)    # [B, H, W]
+
+#     return textured_render_img, mask, face_index_img
 
 
 if __name__ == '__main__':

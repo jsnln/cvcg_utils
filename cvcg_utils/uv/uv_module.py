@@ -178,3 +178,40 @@ def face_attr_to_uv(face_attrs, face_index_map, uv_mask):
     face_attr_map = torch.zeros((B, H, W, C), dtype=face_attrs.dtype, device=face_attrs.device)
     face_attr_map[:, uv_mask] = maskindexed_face_attrs
     return face_attr_map    # [H, W, C]
+
+def sample_texture_by_uv(uv: torch.Tensor, tex_img: torch.Tensor, padding_mode='border'):
+    """
+    uv: [B, ..., 2], (0, 0) is bottom left, (1, 1) is top right
+    tex_img: [B, C, H, W]
+
+    out: [B, ..., C]
+    """
+    assert uv.shape[-1] == 2
+    assert len(uv.shape) >= 2, "uv must have a batch dim"
+    assert len(tex_img.shape) == 4
+    assert uv.shape[0] == tex_img.shape[0]
+
+
+    channels = tex_img.shape[1]
+    if len(uv.shape) > 2:
+        out_shape = [uv.shape[0]] + list(uv.shape[1:-1]) + [channels]
+    else:
+        out_shape = [uv.shape[0], channels]
+
+
+    # flip because grid_sample has a different coordinate system
+    uv = torch.stack([uv[..., 0], 1 - uv[..., 1]], dim=-1)
+    uv = uv.view(uv.shape[0], -1, 1, 2)
+
+    sampled_img = torch.nn.functional.grid_sample(
+        tex_img,
+        (uv * 2 - 1),
+        align_corners=False,
+        padding_mode=padding_mode,
+    )   # [B, C, -1, 1]
+
+    sampled_img = sampled_img.permute(0,2,3,1).reshape(*out_shape)
+
+    return sampled_img
+
+
