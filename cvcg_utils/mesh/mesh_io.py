@@ -97,6 +97,13 @@ def read_ply(fn):
                             plydata['vertex']['texture_v']], axis=-1)
     except:
         vert_uv = None
+
+    try:
+        v_normals = np.stack([plydata['vertex']['nx'],
+                              plydata['vertex']['ny'],
+                              plydata['vertex']['nz']], axis=-1)
+    except:
+        v_normals = None
     
     try:
         v_colors = np.stack([plydata['vertex']['red'],
@@ -116,7 +123,7 @@ def read_ply(fn):
         edge_uv = None
 
     # TODO add support for normals, colors, edge uv
-    mesh = MeshData(verts, faces, None, None, None, None, v_colors, None, edge_uv)
+    mesh = MeshData(verts, faces, None, None, v_normals, None, v_colors, None, edge_uv)
     return mesh
 
 def write_ply(
