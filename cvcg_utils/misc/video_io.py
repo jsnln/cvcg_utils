@@ -13,7 +13,7 @@ def write_video(video_fn, image_seq, fps=30):
         def get_image(i):
             return image_seq[i]
 
-    h, w = get_image[0].shape[:2]
+    h, w = get_image(0).shape[:2]
 
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(video_fn, fourcc, fps, (w,h))
