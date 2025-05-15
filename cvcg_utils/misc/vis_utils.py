@@ -13,10 +13,9 @@ def gen_camera_visualization(K: np.ndarray, c2w: np.ndarray, H: int, W: int, con
         [0, W, 1.],
     ])
     corners_cam = np.einsum('ij,nj->ni', np.linalg.inv(K), uv_corners_homog) * cone_height
-    corners_world = np.einsum('ij,nj->ni', c2w[:3, :3], corners_cam) + c2w[:3, 3]
+    points_cam = np.pad(corners_cam, ((1,0), (0,0)), constant_values=0)   # [5, 3]
+    points_world = np.einsum('ij,nj->ni', c2w[:3, :3], points_cam) + c2w[:3, 3]
 
-    verts = np.pad(corners_world, ((1,0), (0,0)), constant_values=0)   # [5, 3]
-    
     if mode == 'line':
         faces = np.array([
             [0, 1, 0],
@@ -31,4 +30,4 @@ def gen_camera_visualization(K: np.ndarray, c2w: np.ndarray, H: int, W: int, con
     else:
         raise NotImplementedError(f"mode {mode} is not supported")
     
-    return verts, faces
+    return points_world, faces
