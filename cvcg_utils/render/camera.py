@@ -344,7 +344,7 @@ class UnifiedCamera:
         w2c[:3, :3] = self.R
         w2c[:3, 3] = self.T
         self.c2w = np.linalg.inv(w2c)
-        
+
     def scale(self, s_x, s_y):
         K = self.K.copy()
         K[0] = self.K[0] * s_x
@@ -435,11 +435,22 @@ class UnifiedCamera:
         return cls(K, R, T, H, W, name)
 
     @classmethod
-    def from_4d_dress(cls, intr_mat_3x3, extr_mat_3x4, h, w, name=None) -> Self:
+    def from_intr_extr(cls, intr_mat_3x3, extr_mat_3x4, h, w, name=None) -> Self:
+        """
+        both intr 3x3 and extr 3x4 (w2c) follow the opencv convention
+        """
         R = extr_mat_3x4[:, :3]
         T = extr_mat_3x4[:, 3]
         K = intr_mat_3x3
         return cls(K, R, T, h, w, name)
+
+    @classmethod
+    def from_4d_dress(cls, intr_mat_3x3, extr_mat_3x4, h, w, name=None) -> Self:
+        return cls.from_intr_extr(intr_mat_3x3, extr_mat_3x4, h, w)
+        # R = extr_mat_3x4[:, :3]
+        # T = extr_mat_3x4[:, 3]
+        # K = intr_mat_3x3
+        # return cls(K, R, T, h, w, name)
     
     @classmethod
     def from_avatarrex(cls, cam_dict, name=None) -> Self:
