@@ -21,7 +21,7 @@ def write_video(video_fn, image_seq, fps=30):
     for frame_id in trange(len(image_seq)):
         out.write(cv2.cvtColor(get_image(frame_id), cv2.COLOR_RGB2BGR))
 
-def read_video_rgb(video_fn):
+def read_video_rgb(video_fn, frame_range=None):
     import numpy as np
     import cv2
     from tqdm import trange
@@ -33,6 +33,14 @@ def read_video_rgb(video_fn):
     
     for frame_id in trange(num_frames):
         flag, frame_bgr = cap.read()
+
+        if frame_range is not None:
+            assert len(frame_range) == 2
+            if frame_id < frame_range[0]:
+                continue
+            if frame_id >= frame_range[1]:
+                break
+
         assert flag
         assert frame_bgr.shape[-1] == 3
 
