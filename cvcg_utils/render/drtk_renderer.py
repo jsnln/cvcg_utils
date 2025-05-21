@@ -152,6 +152,8 @@ def render_drtk_shaded(
 
     if shading_mode == 'face':
         face_normals = get_face_normals(verts, faces, normalize=True)   # [B, Nf, 3]
+        if len(face_normals.shape) == 2:
+            face_normals = face_normals[None].expand(pts_screen.shape[0], -1, -1)
         b, h, w = face_index_img.shape
         face_index_img_flat = face_index_img.reshape(b, -1, 1).expand(-1, -1, 3).clone()    # [B, H*W, 3]
         face_index_img_flat[face_index_img_flat == -1] = 0
@@ -163,6 +165,9 @@ def render_drtk_shaded(
 
     elif shading_mode == 'vert':
         vert_normals = get_vert_normals(verts, faces, normalize=True)   # [B, Nv, 3]
+        if len(vert_normals.shape) == 2:
+            vert_normals = vert_normals[None].expand(pts_screen.shape[0], -1, -1)
+
         vert_normal_img = drtk.interpolate(vert_normals, faces, face_index_img, bary_img).permute(0,2,3,1)   # [B, H, W, 3]
 
         shaded_img = shading_func(vert_normal_img, face_index_img).permute(0,3,1,2)        # [B, 3, H, W]
