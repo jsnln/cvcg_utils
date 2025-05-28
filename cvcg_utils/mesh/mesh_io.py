@@ -20,6 +20,20 @@ class MeshData:
     v_quality: np.ndarray = None
     edge_uv: np.ndarray = None      # compatible with the `texcoords` field in ply
 
+####################
+##### merge ########
+####################
+
+def merge_meshes(mesh_1: MeshData, mesh_2: MeshData):
+    """
+    performs simple concatenation on verts and faces only
+    """
+    N_v1 = mesh_1.verts.shape[0]
+
+    new_verts = np.concatenate([mesh_1.verts, mesh_2.verts], 0)
+    new_faces = np.concatenate([mesh_1.faces, mesh_2.faces + N_v1], 0)
+
+    return MeshData(new_verts, new_faces)
 
 ####################
 ##### glb file #####
