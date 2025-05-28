@@ -1,6 +1,8 @@
+from typing import List
 import os
 import igl
 import plyfile
+import pygltflib
 import numpy as np
 from dataclasses import dataclass
 from ..misc.image import write_rgb
@@ -15,13 +17,68 @@ class MeshData:
     f_normals: np.ndarray = None
     v_colors: np.ndarray = None
     f_colors: np.ndarray = None
+    v_quality: np.ndarray = None
     edge_uv: np.ndarray = None      # compatible with the `texcoords` field in ply
+
+
+####################
+##### glb file #####
+####################
+
+gltf_numpy_type_mapping = {               # componentType -> dtype
+    pygltflib.BYTE: np.int8,              # BYTE, 5120
+    pygltflib.UNSIGNED_BYTE: np.uint8,    # UNSIGNED_BYTE, 5121
+    pygltflib.SHORT: np.int16,            # SHORT, 5122
+    pygltflib.UNSIGNED_SHORT: np.uint16,  # UNSIGNED_SHORT, 5123
+    pygltflib.UNSIGNED_INT: np.uint32,    # UNSIGNED_INT, 5125
+    pygltflib.FLOAT: np.float32,          # FLOAT, 5126
+}
+
+def read_glb(fn: str) -> List[MeshData]:
+    assert fn.endswith('.glb')
+
+    gltf = pygltflib.GLTF2().load(fn)  # load method auto detects based on extension
+    # get the first mesh in the current scene (in this example there is only one scene and one mesh)
+    mesh = gltf.meshes[gltf.scenes[gltf.scene].nodes[0]]
+
+    # get the vertices for each primitive in the mesh (in this example there is only one)
+    mesh_list = []
+    for primitive in mesh.primitives:
+
+        vertex_accessor = gltf.accessors[primitive.attributes.POSITION]
+        vertex_buffer_view = gltf.bufferViews[vertex_accessor.bufferView]
+
+        vertices = np.ascontiguousarray(np.frombuffer(
+            gltf.binary_blob()[
+                vertex_buffer_view.byteOffset + vertex_accessor.byteOffset :
+                vertex_buffer_view.byteOffset + vertex_buffer_view.byteLength
+            ],
+            dtype=gltf_numpy_type_mapping[vertex_accessor.componentType],
+            count=vertex_accessor.count * 3,
+        ).reshape((-1, 3)).astype(np.float64))
+
+        # faces
+        face_accessor = gltf.accessors[primitive.indices]
+        face_buffer_view = gltf.bufferViews[face_accessor.bufferView]
+
+        faces = np.ascontiguousarray(np.frombuffer(
+            gltf.binary_blob()[
+                face_buffer_view.byteOffset + face_accessor.byteOffset :
+                face_buffer_view.byteOffset + face_buffer_view.byteLength
+            ],
+            dtype=gltf_numpy_type_mapping[face_accessor.componentType],
+            count=face_accessor.count,
+        ).reshape((-1, 3)).astype(np.int64))
+
+        mesh_list.append(MeshData(vertices, faces))
+
+    return mesh_list
 
 ####################
 ##### obj file #####
 ####################
 
-def read_obj(fn: str):
+def read_obj(fn: str) -> MeshData:
     assert fn.endswith('.obj')
 
     verts, uv_verts, v_normals, faces, uv_faces, f_normals = \
@@ -85,7 +142,7 @@ Ns 0.000000
 ##### ply file #####
 ####################
 
-def read_ply(fn):
+def read_ply(fn) -> MeshData:
     with open(fn, 'rb') as f:
         plydata = plyfile.PlyData.read(f)
     
@@ -113,6 +170,11 @@ def read_ply(fn):
         v_colors = None
 
     try:
+        v_quality = np.array(plydata['vertex']['quality'])
+    except:
+        v_quality = None
+
+    try:
         faces = np.stack(plydata['face']['vertex_indices'], axis=0)
     except:
         faces = None
@@ -123,7 +185,7 @@ def read_ply(fn):
         edge_uv = None
 
     # TODO add support for normals, colors, edge uv
-    mesh = MeshData(verts, faces, None, None, v_normals, None, v_colors, None, edge_uv)
+    mesh = MeshData(verts, faces, None, None, v_normals, None, v_colors, None, v_quality, edge_uv)
     return mesh
 
 def write_ply(
