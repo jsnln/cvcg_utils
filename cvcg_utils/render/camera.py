@@ -279,16 +279,20 @@ class BatchDRTKCamera(torch.nn.Module):
 
     def proj_points_to_drtk_screen(self, pts: torch.Tensor, detach_z: bool):
         """
-        pts: [N, 3], unbatched points
+        pts: [B, N, 3] or [N, 3]
 
         out: [B, N, 3], batched DRTK screen space coordinates, (-0.5, -0.5) to (W-0.5, H-0.5)
         """
-        assert len(pts.shape) == 2, "input points must be unbatched, since cameras are batched"
         assert pts.shape[-1] == 3
+        assert (len(pts.shape) == 2) or (len(pts.shape) == 3 and pts.shape[0] == self.batch_size), \
+            "input points must be unbatched, or have the same batch size the batched cameras"
+        
+        if len(pts.shape) == 2:
+            pts = pts[None].expand(self.batch_size, -1, -1) # [B, N, 4]
 
         # full projection
-        pts_wld_homog = torch.nn.functional.pad(pts, (0,1), mode='constant', value=1)       # [N, 4]
-        pts_cam_homog = torch.einsum('byx,nx->bny', self.w2c_mat, pts_wld_homog)    # [B, N, 4]
+        pts_wld_homog = torch.nn.functional.pad(pts, (0,1), mode='constant', value=1) # [B, N, 4]
+        pts_cam_homog = torch.einsum('byx,bnx->bny', self.w2c_mat, pts_wld_homog)     # [B, N, 4]
         
         if not detach_z:
             pts_clip_homog = torch.einsum('byx,bnx->bny', self.proj_mat,  pts_cam_homog)    # [B, N, 4]

@@ -29,13 +29,15 @@ def render_drtk_face_attr(
     face_attrs: unbatched [Nf, C], shared by items in the vertex batch
     bg_attr: [C], shared by items in the vertex batch
     """
-
-    if isinstance(camera, DRTKCamera):
-        assert len(verts.shape) == 3
-    elif isinstance(camera, BatchDRTKCamera):
-        assert len(verts.shape) == 2
-    else:
-        raise NotImplementedError
+    # determine batching mode
+    batched = True      # whether at least one of `camera` or `verts` is batched
+    if isinstance(camera, BatchDRTKCamera):     # if `camera` is batched, then either `verts` is unbatched or has the same batch size
+        assert len(verts.shape) == 2 or \
+              (len(verts.shape) == 3 and verts.shape[0] == camera.batch_size)
+    elif isinstance(camera, DRTKCamera):        # if `camera` is unbatched, then `verts` can be batched
+        if len(verts.shape) == 2:
+            batched = False
+            verts = verts[None]
 
     assert len(faces.shape) == 2
     assert len(face_attrs.shape) == 2
@@ -54,6 +56,11 @@ def render_drtk_face_attr(
     bg_img = bg_attr[None, None, None] * (~mask)[..., None]    # [1, 1, 1, C] * [B, H, W, 1] => [B, H, W, C]
 
     out_img = face_attr_img + bg_img
+
+    if not batched:
+        out_img = out_img.squeeze(0)
+        mask = mask.squeeze(0)
+        face_index_img = face_index_img.squeeze(0)
 
     return out_img, mask, face_index_img
 
@@ -77,17 +84,26 @@ def render_drtk_vert_attr(
     if verts and vert_attrs align, then attr_faces == faces,
     but distinguishing them allows other cases, e.g., uvs
     """
-    if isinstance(camera, DRTKCamera):
-        assert len(verts.shape) == 3
-        assert len(vert_attrs.shape) == 3
-        assert verts.shape[0] == vert_attrs.shape[0]
-    elif isinstance(camera, BatchDRTKCamera):
-        assert len(verts.shape) == 2
-        assert len(vert_attrs.shape) == 2
-        batch_size = camera.proj_mat.shape[0]
-        vert_attrs = vert_attrs[None].expand(batch_size, -1, -1)
-    else:
-        raise NotImplementedError
+    assert len(verts.shape) == len(vert_attrs.shape)
+    if len(vert_attrs.shape) == 3 and len(verts.shape) == 3:
+            assert verts.shape[0] == vert_attrs.shape[0]
+    
+    # determine batching mode
+    batched = True      # whether at least one of `camera` or `verts` is batched
+    if isinstance(camera, BatchDRTKCamera):     # if `camera` is batched, then either `verts` is unbatched or has the same batch size
+        assert len(verts.shape) == 2 or \
+              (len(verts.shape) == 3 and verts.shape[0] == camera.batch_size)
+
+        # additionally check whether `vert_attrs` is batched
+        if len(vert_attrs.shape) == 2:
+            vert_attrs = vert_attrs[None].expand(camera.batch_size, -1, -1)
+
+    elif isinstance(camera, DRTKCamera):        # if `camera` is unbatched, then `verts` can be batched
+        if len(verts.shape) == 2:
+            batched = False
+            verts = verts[None]
+            vert_attrs = vert_attrs[None]
+
 
     assert len(faces.shape) == 2
     assert len(attr_faces.shape) == 2
@@ -111,6 +127,11 @@ def render_drtk_vert_attr(
             bary_img,       # barys
             vert_attr_img, # rendered image
             face_index_img)  # face indices
+        
+    if not batched:
+        vert_attr_img = vert_attr_img.squeeze(0)
+        depth_img = depth_img.squeeze(0)
+        face_index_img = face_index_img.squeeze(0)
 
     return vert_attr_img, depth_img, mask, face_index_img
 
@@ -205,12 +226,14 @@ def render_drtk_uv_textured(
     face_attrs: unbatched [Nf, C], shared by items in the vertex batch
     bg_attr: [C], shared by items in the vertex batch
     """
-    if isinstance(camera, DRTKCamera):
-        assert len(verts.shape) == 3
-    elif isinstance(camera, BatchDRTKCamera):
-        assert len(verts.shape) == 2
-    else:
-        raise NotImplementedError
+    batched = True      # whether at least one of `camera` or `verts` is batched
+    if isinstance(camera, BatchDRTKCamera):     # if `camera` is batched, then either `verts` is unbatched or has the same batch size
+        assert len(verts.shape) == 2 or \
+              (len(verts.shape) == 3 and verts.shape[0] == camera.batch_size)
+    elif isinstance(camera, DRTKCamera):        # if `camera` is unbatched, then `verts` can be batched
+        if len(verts.shape) == 2:
+            batched = False
+            verts = verts[None]
 
     assert len(faces.shape) == 2
     assert len(uv_verts.shape) == 2
@@ -250,6 +273,11 @@ def render_drtk_uv_textured(
             mask.float()[:, None],  # rendered image
             face_index_img, # face indices
             ).squeeze(1)    # [B, H, W]
+        
+    if not batched:
+        textured_render_img = textured_render_img.squeeze(0)
+        mask = mask.squeeze(0)
+        face_index_img = face_index_img.squeeze(0)
 
     return textured_render_img, mask, face_index_img
 
@@ -319,7 +347,6 @@ def render_drtk_uv_textured(
 #             ).squeeze(1)    # [B, H, W]
 
 #     return textured_render_img, mask, face_index_img
-
 
 if __name__ == '__main__':
 
