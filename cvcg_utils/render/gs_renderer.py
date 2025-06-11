@@ -1,17 +1,17 @@
 
 import torch
 # from diff_gaussian_rasterization import GaussianRasterizationSettings, GaussianRasterizer
-from diff_gaussian_rasterization_debug import GaussianRasterizationSettings, GaussianRasterizer
+# from diff_gaussian_rasterization_debug import GaussianRasterizationSettings, GaussianRasterizer
+from diff_gaussian_rasterization_depth_trunc import GaussianRasterizationSettings, GaussianRasterizer
+from .camera import UnifiedCamera
 from .sh_utils import eval_sh
 
 def render_gs(camera,
            xyz: torch.Tensor,
            opacity: torch.Tensor,
-        #    pc : GaussianModel,
            scales: torch.Tensor,
            rotations: torch.Tensor,
            cov3D_precomp: torch.Tensor,
-        #    scaling_modifier = 1.0,
            override_color = None,
            compute_cov3D_python: bool = False,
            convert_SHs_python: bool = False,
@@ -25,10 +25,14 @@ def render_gs(camera,
     
     Background tensor (bg_color) must be on GPU!
     """
-    rasterizer = make_gs_rasterizer(camera, bg_color=torch.tensor([0., 0., 0.]).cuda())
+    if termi_depth_img is None:
+        zfar = 100
+        termi_depth_img = zfar * torch.ones(camera.H, camera.W, device=xyz.device)
+
+    rasterizer = make_gs_rasterizer(camera, bg_color=torch.tensor([0., 0., 0.], device=xyz.device))
  
     # Create zero tensor. We will use it to make pytorch return gradients of the 2D (screen-space) means
-    screenspace_points = torch.zeros_like(xyz, dtype=xyz.dtype, requires_grad=True, device="cuda") + 0
+    screenspace_points = torch.zeros_like(xyz, dtype=xyz.dtype, requires_grad=True, device=xyz.device) + 0
     try:
         screenspace_points.retain_grad()
     except:
@@ -116,7 +120,7 @@ def render_gs(camera,
     
     return out
 
-def make_gs_rasterizer(camera, bg_color, scaling_modifier=1.0, active_sh_degree=0, debug=False, antialiasing=False):
+def make_gs_rasterizer(camera: UnifiedCamera, bg_color, scaling_modifier=1.0, active_sh_degree=0, debug=False, antialiasing=False):
 
     FoVx, FoVy, tanfovx, tanfovy, world_view_transform, projection_matrix, full_proj_transform, camera_center = camera.to_3dgs_format()
 
