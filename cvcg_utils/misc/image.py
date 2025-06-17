@@ -45,6 +45,14 @@ def write_rgb_uint16(fn: str, rgb: np.ndarray):
     cv2.imwrite(fn, bgr)
 
 
+def write_grayscale_uint16(fn: str, grayscale: np.ndarray):
+    assert grayscale.dtype == np.float16
+    assert len(grayscale.shape) == 2
+    assert os.path.splitext(fn)[-1] in ['.png']
+
+    cv2.imwrite(fn, grayscale)
+
+
 def write_rgba_uint16(fn: str, rgba: np.ndarray):
     assert rgba.dtype == np.uint16
     assert len(rgba.shape) == 3
