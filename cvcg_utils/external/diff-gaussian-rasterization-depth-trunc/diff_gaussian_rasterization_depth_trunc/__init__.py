@@ -141,6 +141,7 @@ class _RasterizeGaussians(torch.autograd.Function):
             grad_rotations,
             grad_cov3Ds_precomp,
             None,
+            None,   # grad for termin_depth
         )
 
         return grads

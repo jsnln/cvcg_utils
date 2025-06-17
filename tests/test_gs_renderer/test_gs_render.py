@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 import numpy as np
 from cvcg_utils.render.camera import UnifiedCamera
-from cvcg_utils.render.gs_renderer import render_gs
+from cvcg_utils.render.gs_renderer import render_gs, strip_symmetric
 from cvcg_utils.misc.image import write_rgb
 
 def load_pickle(path):
@@ -13,31 +13,17 @@ def load_pickle(path):
         data = pickle.load(file)
     return data
 
-def strip_lowerdiag(L):
-    uncertainty = torch.zeros((L.shape[0], 6), dtype=torch.float, device="cuda")
-    uncertainty[:, 0] = L[:, 0, 0]
-    uncertainty[:, 1] = L[:, 0, 1]
-    uncertainty[:, 2] = L[:, 0, 2]
-    uncertainty[:, 3] = L[:, 1, 1]
-    uncertainty[:, 4] = L[:, 1, 2]
-    uncertainty[:, 5] = L[:, 2, 2]
-    return uncertainty
-
-def strip_symmetric(sym):
-    return strip_lowerdiag(sym)
-
 camera = UnifiedCamera.from_lookat(
     center=np.array([0., 0., 1.]),
     lookat=np.array([0., 0., 0.]),
     up=np.array([0., 1., 0.]),
     fov_x=60, fov_y=60, fov_mode='deg',
-    K=None, H=1024, W=1024)
+    K=None, H=1024, W=1024).to_3dgs_format()
 
 # camera = camera
-
 verts = np.array([
-    [-.1, 0., -.001],
-    [0., .2, 0.001],
+    [-.1, 0., -.001],   # red
+    [0., .2, 0.001],    # green
 ])
 
 xyz = torch.from_numpy(verts).float().cuda()

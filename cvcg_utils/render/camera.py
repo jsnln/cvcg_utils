@@ -4,6 +4,10 @@ import math
 import numpy as np
 import torch
 
+def focal2fov(focal, pixels):
+    return 2 * math.atan(pixels / (2*focal))
+    
+
 def assert_ints(*args):
     for arg in args:
         assert isinstance(arg, int)
@@ -12,7 +16,7 @@ def assert_floats(*args):
     for arg in args:
         assert isinstance(arg, float)
 
-def get_projection_matrix_3dgs(znear, zfar, fov_x=None, fov_y=None, K=None, img_h=None, img_w=None):
+def get_projection_matrix_3dgs(znear, zfar, fov_x=None, fov_y=None, K=None, img_h=None, img_w=None, array_package = np, device = None):
     if K is None:
         tanHalffov_y = math.tan((fov_y / 2))
         tanHalffov_x = math.tan((fov_x / 2))
@@ -29,7 +33,8 @@ def get_projection_matrix_3dgs(znear, zfar, fov_x=None, fov_y=None, K=None, img_
         bottom = (K[1, 2] - img_h) * near_fy
         top = K[1, 2] * near_fy
 
-    P = np.zeros((4, 4))
+    P = array_package.zeros((4, 4), device=device)
+
 
     P[0, 0] = 2.0 * znear / (right - left)
     P[1, 1] = 2.0 * znear / (top - bottom)
@@ -316,6 +321,48 @@ class BatchDRTKCamera(torch.nn.Module):
         
         return pts_screen
     
+class GSCamera:
+    """
+    camera frame uses the OpenGL convention
+
+    the z clip coord is slightly different from OpenGL 
+    """
+    def __init__(self,
+                 tanfov_x: float,
+                 tanfov_y: float,
+                 world_view_transform: torch.Tensor,
+                 projection_matrix: torch.Tensor,
+                 full_proj_transform: torch.Tensor,
+                 camera_center: torch.Tensor,
+                 H: int, W: int):
+
+        self.tanfov_x = tanfov_x
+        self.tanfov_y = tanfov_y
+        self.world_view_transform = world_view_transform
+        self.projection_matrix = projection_matrix
+        self.full_proj_transform = full_proj_transform
+        self.camera_center = camera_center
+        self.H = H
+        self.W = W
+
+    @classmethod
+    def from_intr_extr_torch(cls, intr_3x3: torch.Tensor, extr_4x4: torch.Tensor, H: int, W: int):
+        
+        intr = intr_3x3
+        extr = extr_4x4
+
+        # Set up rasterization configuration
+        fov_x = focal2fov(intr[0, 0].item(), W)
+        fov_y = focal2fov(intr[1, 1].item(), H)
+        tanfov_x = math.tan(fov_x * 0.5)
+        tanfov_y = math.tan(fov_y * 0.5)
+
+        world_view_transform = extr.T
+        projection_matrix = get_projection_matrix_3dgs(znear = 0.1, zfar = 100, fov_x = fov_x, fov_y = fov_y, K = intr, img_w = W, img_h = H, array_package=torch, device=intr_3x3.device).T
+        full_proj_transform = world_view_transform @ projection_matrix
+        camera_center = torch.linalg.inv(extr)[:3, 3]
+        return cls(tanfov_x, tanfov_y, world_view_transform, projection_matrix, full_proj_transform, camera_center, H, W)
+
 
 class NvdiffrecmcCamera(torch.nn.Module):
     def __init__(self, mvp, campos, H, W):
@@ -526,11 +573,9 @@ class UnifiedCamera:
         
         return NvdiffrecmcCamera(mvp, campos, self.H, self.W)
 
-    def to_3dgs_format(self):
+    def to_3dgs_format(self, znear=.1, zfar=100.) -> GSCamera:
 
-        def focal2fov(focal, pixels):
-            return 2 * math.atan(pixels / (2*focal))
-    
+        
         extr = np.identity(4, np.float32)
         extr[:3, :3] = self.R
         extr[:3, 3] = self.T
@@ -542,7 +587,13 @@ class UnifiedCamera:
         tanfov_y = math.tan(fov_y * 0.5)
 
         world_view_transform = extr.T
-        projection_matrix = get_projection_matrix_3dgs(znear = 0.1, zfar = 100, fov_x = fov_x, fov_y = fov_y, K = self.K, img_w = self.W, img_h = self.H).T
+        projection_matrix = get_projection_matrix_3dgs(znear = znear, zfar = zfar, fov_x = fov_x, fov_y = fov_y, K = self.K, img_w = self.W, img_h = self.H).T
         full_proj_transform = world_view_transform @ projection_matrix
         camera_center = np.linalg.inv(extr)[:3, 3]
-        return fov_x, fov_y, tanfov_x, tanfov_y, world_view_transform, projection_matrix, full_proj_transform, camera_center
+
+        return GSCamera(tanfov_x, tanfov_y,
+                        torch.from_numpy(world_view_transform),
+                        torch.from_numpy(projection_matrix),
+                        torch.from_numpy(full_proj_transform),
+                        torch.from_numpy(camera_center),
+                        self.H, self.W)

@@ -1,12 +1,41 @@
 
+import math
 import torch
 # from diff_gaussian_rasterization import GaussianRasterizationSettings, GaussianRasterizer
 # from diff_gaussian_rasterization_debug import GaussianRasterizationSettings, GaussianRasterizer
 from diff_gaussian_rasterization_depth_trunc import GaussianRasterizationSettings, GaussianRasterizer
-from .camera import UnifiedCamera
+from .camera import UnifiedCamera, GSCamera
 from .sh_utils import eval_sh
 
-def render_gs(camera,
+def strip_lowerdiag(L):
+    uncertainty = torch.zeros((L.shape[0], 6), dtype=torch.float, device="cuda")
+    uncertainty[:, 0] = L[:, 0, 0]
+    uncertainty[:, 1] = L[:, 0, 1]
+    uncertainty[:, 2] = L[:, 0, 2]
+    uncertainty[:, 3] = L[:, 1, 1]
+    uncertainty[:, 4] = L[:, 1, 2]
+    uncertainty[:, 5] = L[:, 2, 2]
+    return uncertainty
+
+def strip_symmetric(sym):
+    return strip_lowerdiag(sym)
+
+
+def quat_from_axis_angle(npts, axis, angle):
+    axis = torch.nn.functional.normalize(axis, dim=-1)
+    cos_angleo2 = math.cos(angle/2)
+    sin_angleo2 = math.sin(angle/2)
+
+    quats = torch.zeros(npts, 4)
+    quats[:, 0] = cos_angleo2
+    quats[:, 1] = sin_angleo2 * axis[0]
+    quats[:, 2] = sin_angleo2 * axis[1]
+    quats[:, 3] = sin_angleo2 * axis[2]
+
+    return quats
+
+
+def render_gs(camera: GSCamera,
            xyz: torch.Tensor,
            opacity: torch.Tensor,
            scales: torch.Tensor,
@@ -24,7 +53,16 @@ def render_gs(camera,
     Render the scene. 
     
     Background tensor (bg_color) must be on GPU!
+
+    xyz:            [N, 3]
+    opacity:        [N, 1]
+    scales:         [N, 3], overridable by cov3D_precomp
+    rotations:      [N, 3], overridable by cov3D_precomp
+    cov3D_precomp:  [N, 6], stores only the lower diag. use `strip_symmetric` to obtain this)
+    override_color: [N, 3]
+    ...
     """
+
     if termi_depth_img is None:
         zfar = 100
         termi_depth_img = zfar * torch.ones(camera.H, camera.W, device=xyz.device)
@@ -120,22 +158,22 @@ def render_gs(camera,
     
     return out
 
-def make_gs_rasterizer(camera: UnifiedCamera, bg_color, scaling_modifier=1.0, active_sh_degree=0, debug=False, antialiasing=False):
+def make_gs_rasterizer(camera: GSCamera, bg_color, scaling_modifier=1.0, active_sh_degree=0, debug=False, antialiasing=False):
 
-    FoVx, FoVy, tanfovx, tanfovy, world_view_transform, projection_matrix, full_proj_transform, camera_center = camera.to_3dgs_format()
+    # FoVx, FoVy, tanfovx, tanfovy, world_view_transform, projection_matrix, full_proj_transform, camera_center = camera.to_3dgs_format()
 
     # Set up rasterization configuration
     raster_settings = GaussianRasterizationSettings(
         image_height=int(camera.H),
         image_width=int(camera.W),
-        tanfovx=tanfovx,
-        tanfovy=tanfovy,
+        tanfovx=camera.tanfov_x,
+        tanfovy=camera.tanfov_y,
         bg=bg_color,
         scale_modifier=scaling_modifier,
-        viewmatrix=torch.from_numpy(world_view_transform).float().cuda(),
-        projmatrix=torch.from_numpy(full_proj_transform).float().cuda(),
+        viewmatrix=camera.world_view_transform.clone().float().cuda(),
+        projmatrix=camera.full_proj_transform.clone().float().cuda(),
         sh_degree=active_sh_degree,
-        campos=torch.from_numpy(camera_center).float().cuda(),
+        campos=camera.camera_center.clone().float().cuda(),
         prefiltered=False,
         debug=debug,
         antialiasing=antialiasing

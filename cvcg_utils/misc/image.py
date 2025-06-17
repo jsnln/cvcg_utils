@@ -8,13 +8,11 @@ def read_rgb(fn):
     assert img.shape[-1] == 3
     return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-
 def read_rgba(fn):
     img = cv2.imread(fn, cv2.IMREAD_UNCHANGED)
     assert len(img.shape) == 3
     assert img.shape[-1] == 4
     return cv2.cvtColor(img, cv2.COLOR_BGRA2RGBA)
-
 
 def read_grayscale(fn: str):
     grayscale = cv2.imread(fn, cv2.IMREAD_UNCHANGED)
@@ -36,6 +34,25 @@ def write_rgb(fn: str, rgb: np.ndarray):
 
     bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
     cv2.imwrite(fn, bgr)
+
+def write_rgb_uint16(fn: str, rgb: np.ndarray):
+    assert rgb.dtype == np.uint16
+    assert len(rgb.shape) == 3
+    assert rgb.shape[2] == 3
+    assert os.path.splitext(fn)[-1] in ['.png', '.jpg', '.jpeg']
+
+    bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+    cv2.imwrite(fn, bgr)
+
+
+def write_rgba_uint16(fn: str, rgba: np.ndarray):
+    assert rgba.dtype == np.uint16
+    assert len(rgba.shape) == 3
+    assert rgba.shape[2] == 4
+    assert os.path.splitext(fn)[-1] in ['.png', '.jpg', '.jpeg']
+
+    bgra = cv2.cvtColor(rgba, cv2.COLOR_RGBA2BGRA)
+    cv2.imwrite(fn, bgra)
 
 def write_rgb_exr(fn: str, rgb: np.ndarray):
     assert rgb.dtype == np.float32
