@@ -56,7 +56,7 @@ def write_rgb_uint16(fn: str, rgb: np.ndarray):
 
 
 def write_grayscale_uint16(fn: str, grayscale: np.ndarray):
-    assert grayscale.dtype == np.float16
+    assert grayscale.dtype == np.uint16
     assert len(grayscale.shape) == 2
     assert os.path.splitext(fn)[-1] in ['.png']
 
