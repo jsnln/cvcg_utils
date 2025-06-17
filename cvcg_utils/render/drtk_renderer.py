@@ -13,7 +13,8 @@ def render_drtk_face_attr(
         camera: Union[DRTKCamera, BatchDRTKCamera],
         verts: torch.Tensor,
         faces: torch.Tensor,
-        face_attrs: torch.Tensor):
+        face_attrs: torch.Tensor,
+        make_differentiable=False):
     
     """
     supports two batching modes: camera batching and vert batching
@@ -48,16 +49,34 @@ def render_drtk_face_attr(
     mask = (face_index_img > -1)  # [B, H, W]
     # mask_float = mask.float()  # [B, H, W]
     
+    depth_img, bary_img = drtk.render(pts_screen, faces, face_index_img)    # [B, 3, H, W]
+    
     # face_index_img[~mask] = 0     # NOTE you can't do this!!! otherwise there's no edge grad
     face_attr_img = face_attrs[face_index_img]        # [Nf, C] indexed by [B, H, W] => [B, H, W, C]
     face_attr_img = face_attr_img * mask[..., None]   # re-mask
 
-    if not batched:
-        out_img = out_img.squeeze(0)
-        mask = mask.squeeze(0)
-        face_index_img = face_index_img.squeeze(0)
+    if make_differentiable:
+        face_attr_img = drtk.edge_grad_estimator(
+            pts_screen,     # verts for rasterization
+            faces,          # faces
+            bary_img,       # barys
+            face_attr_img, # rendered image
+            face_index_img)  # face indices
+        
+        mask = drtk.edge_grad_estimator(
+            pts_screen,     # verts for rasterization
+            faces,          # faces
+            bary_img,       # barys
+            mask.float()[:, None],  # rendered image
+            face_index_img, # face indices
+            ).squeeze(1)    # [B, H, W]
 
-    return out_img, mask, face_index_img
+    if not batched:
+        face_attr_img = face_attr_img.squeeze(0)
+        mask = mask.squeeze(0)
+        face_attr_img = face_index_img.squeeze(0)
+
+    return face_attr_img, depth_img, mask, face_index_img
 
 
 def render_drtk_vert_attr(
@@ -122,6 +141,14 @@ def render_drtk_vert_attr(
             bary_img,       # barys
             vert_attr_img, # rendered image
             face_index_img)  # face indices
+        
+        mask = drtk.edge_grad_estimator(
+            pts_screen,     # verts for rasterization
+            faces,          # faces
+            bary_img,       # barys
+            mask.float()[:, None],  # rendered image
+            face_index_img, # face indices
+            ).squeeze(1)    # [B, H, W]
         
     if not batched:
         vert_attr_img = vert_attr_img.squeeze(0)
