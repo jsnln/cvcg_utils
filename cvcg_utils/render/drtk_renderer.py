@@ -13,8 +13,7 @@ def render_drtk_face_attr(
         camera: Union[DRTKCamera, BatchDRTKCamera],
         verts: torch.Tensor,
         faces: torch.Tensor,
-        face_attrs: torch.Tensor,
-        bg_attr: torch.Tensor):
+        face_attrs: torch.Tensor):
     
     """
     supports two batching modes: camera batching and vert batching
@@ -42,7 +41,6 @@ def render_drtk_face_attr(
     assert len(faces.shape) == 2
     assert len(face_attrs.shape) == 2
     assert faces.shape[0] == face_attrs.shape[0]
-    assert face_attrs.shape[1] == bg_attr.shape[0]
 
     pts_screen = camera.proj_points_to_drtk_screen(verts, detach_z=False)  # [B, N, 3]
 
@@ -50,12 +48,9 @@ def render_drtk_face_attr(
     mask = (face_index_img > -1)  # [B, H, W]
     # mask_float = mask.float()  # [B, H, W]
     
-    # face_index_img[~mask] = 0
+    # face_index_img[~mask] = 0     # NOTE you can't do this!!! otherwise there's no edge grad
     face_attr_img = face_attrs[face_index_img]        # [Nf, C] indexed by [B, H, W] => [B, H, W, C]
     face_attr_img = face_attr_img * mask[..., None]   # re-mask
-    bg_img = bg_attr[None, None, None] * (~mask)[..., None]    # [1, 1, 1, C] * [B, H, W, 1] => [B, H, W, C]
-
-    out_img = face_attr_img + bg_img
 
     if not batched:
         out_img = out_img.squeeze(0)
