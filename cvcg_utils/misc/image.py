@@ -35,6 +35,16 @@ def write_rgb(fn: str, rgb: np.ndarray):
     bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
     cv2.imwrite(fn, bgr)
 
+
+def write_rgba(fn: str, rgba: np.ndarray):
+    assert rgba.dtype == np.uint8
+    assert len(rgba.shape) == 3
+    assert rgba.shape[2] == 4
+    assert os.path.splitext(fn)[-1] in ['.png', '.jpg', '.jpeg']
+
+    bgra = cv2.cvtColor(rgba, cv2.COLOR_RGB2BGR)
+    cv2.imwrite(fn, bgra)
+
 def write_rgb_uint16(fn: str, rgb: np.ndarray):
     assert rgb.dtype == np.uint16
     assert len(rgb.shape) == 3
