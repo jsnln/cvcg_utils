@@ -1,11 +1,6 @@
-import os
-import igl
-import numpy as np
 import drtk
-import drtk.interpolate_ext
 import torch
 from typing import Callable, Union
-from torchvision.utils import save_image  # to save images
 from ..mesh.mesh_proc import get_vert_normals, get_face_normals
 from .camera import DRTKCamera, BatchDRTKCamera
 
