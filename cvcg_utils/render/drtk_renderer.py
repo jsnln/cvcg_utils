@@ -266,8 +266,6 @@ def render_drtk_uv_textured(
         assert len(texture_img.shape) == 4, "since cameras and/or verts are unbatched, texture_img must also be batched"
         assert texture_img.shape[0] == camera.batch_size, "texture_img must have the same batch size as cameras/verts"
 
-
-
     if flip_v:
         uv_verts = torch.stack([uv_verts[..., 0], 1 - uv_verts[..., 1]], dim=-1)
 
