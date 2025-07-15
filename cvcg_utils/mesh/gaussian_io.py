@@ -24,6 +24,16 @@ from plyfile import PlyData, PlyElement
 # from utils.general_utils import strip_symmetric, build_scaling_rotation
 
 @dataclass
+class ActGaussianModelTorch:
+    xyz: torch.Tensor
+    features: torch.Tensor
+    opacity: torch.Tensor
+    scaling: torch.Tensor
+    rotation: torch.Tensor
+    max_sh_degree: int
+
+
+@dataclass
 class PreactGaussianModelNp:
     xyz: np.ndarray
     features_dc: np.ndarray
@@ -33,7 +43,25 @@ class PreactGaussianModelNp:
     rotation: np.ndarray
     max_sh_degree: int
 
-
+    def activate(self) -> ActGaussianModelTorch:
+        xyz = torch.from_numpy(self.xyz).float().contiguous().cuda()
+        features_dc = torch.from_numpy(self.features_dc).float().contiguous().cuda()
+        features_rest = torch.from_numpy(self.features_rest).float().contiguous().cuda()
+        features = torch.cat((features_dc, features_rest), dim=1)
+        opacity = torch.sigmoid(torch.from_numpy(self.opacity).float().contiguous()).cuda()
+        scaling = torch.exp(torch.from_numpy(self.scaling).float().contiguous()).cuda()
+        rotation = torch.nn.functional.normalize(torch.from_numpy(self.rotation).float().contiguous()).cuda()
+        max_sh_degree = self.max_sh_degree
+        
+        return ActGaussianModelTorch(
+            xyz=xyz,
+            features=features,
+            opacity=opacity,
+            scaling=scaling,
+            rotation=rotation,
+            max_sh_degree=max_sh_degree,
+        )
+        
 def load_ply(path):
     plydata = PlyData.read(path)
 
@@ -80,4 +108,4 @@ def load_ply(path):
     # self._rotation = nn.Parameter(torch.tensor(rots, dtype=torch.float, device="cuda").requires_grad_(True))
     # self.active_sh_degree = self.max_sh_degree
 
-    return PreActGaussianModelNp(xyz, features_dc.transpose(0,2,1), features_extra.transpose(0,2,1), opacities, scales, rots, max_sh_degree)
+    return PreactGaussianModelNp(xyz, features_dc.transpose(0,2,1), features_extra.transpose(0,2,1), opacities, scales, rots, max_sh_degree)

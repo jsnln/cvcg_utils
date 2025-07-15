@@ -1,0 +1,8 @@
+> [0;32m/home/trisst/workplace/cvcg_utils/tests/test_gs_renderer/test_gs_render.py[0m(61)[0;36m<module>[0;34m()[0m
+[0;32m     60 [0;31m[0;31m# xyz_camera_space = torch.from_numpy(camera.proj_world2camera_opencv(xyz.cpu().numpy())).float().cuda()[0m[0;34m[0m[0;34m[0m[0m
+[0m[0;32m---> 61 [0;31m[0mtermi_depth_img[0m [0;34m=[0m [0mtorch[0m[0;34m.[0m[0mones[0m[0;34m([0m[0;34m)[0m[0;34m[0m[0;34m[0m[0m
+[0m[0;32m     62 [0;31m[0mrendered_xyz[0m [0;34m=[0m [0mrender_gs[0m[0;34m([0m[0mcamera[0m[0;34m,[0m [0mxyz[0m[0;34m,[0m [0mopacity[0m[0;34m,[0m [0mscales[0m[0;34m=[0m[0;32mNone[0m[0;34m,[0m [0mrotations[0m[0;34m=[0m[0;32mNone[0m[0;34m,[0m [0mcov3D_precomp[0m[0;34m=[0m[0mcov3D_precomp[0m[0;34m,[0m [0moverride_color[0m[0;34m=[0m[0moverride_color[0m[0;34m,[0m [0mclip_value[0m[0;34m=[0m[0;32mFalse[0m[0;34m)[0m[0;34m[0m[0;34m[0m[0m
+[0m
+ipdb> --KeyboardInterrupt--
+ipdb> --KeyboardInterrupt--
+ipdb> 

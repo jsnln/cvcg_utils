@@ -574,8 +574,6 @@ class UnifiedCamera:
         return NvdiffrecmcCamera(mvp, campos, self.H, self.W)
 
     def to_3dgs_format(self, znear=.1, zfar=100.) -> GSCamera:
-
-        
         extr = np.identity(4, np.float32)
         extr[:3, :3] = self.R
         extr[:3, 3] = self.T
