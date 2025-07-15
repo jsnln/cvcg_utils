@@ -1,9 +1,7 @@
 
 import math
 import torch
-# from diff_gaussian_rasterization import GaussianRasterizationSettings, GaussianRasterizer
-# from diff_gaussian_rasterization_debug import GaussianRasterizationSettings, GaussianRasterizer
-from diff_gaussian_rasterization_depth_trunc import GaussianRasterizationSettings, GaussianRasterizer
+from diff_gaussian_rasterization import GaussianRasterizationSettings, GaussianRasterizer
 from .camera import UnifiedCamera, GSCamera
 from .sh_utils import eval_sh
 
