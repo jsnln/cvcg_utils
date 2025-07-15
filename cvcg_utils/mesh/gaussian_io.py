@@ -18,10 +18,7 @@ import json
 # from utils.system_utils import mkdir_p
 from dataclasses import dataclass
 from plyfile import PlyData, PlyElement
-# from utils.sh_utils import RGB2SH
-# from simple_knn._C import distCUDA2
-# from utils.graphics_utils import BasicPointCloud
-# from utils.general_utils import strip_symmetric, build_scaling_rotation
+from pytorch3d.transforms import quaternion_to_matrix, matrix_to_quaternion
 
 @dataclass
 class ActGaussianModelTorch:
@@ -31,6 +28,27 @@ class ActGaussianModelTorch:
     scaling: torch.Tensor
     rotation: torch.Tensor
     max_sh_degree: int
+
+    def rigid_transform(self, transf_mat: torch.Tensor):
+        """
+        transf_mat: [4, 4], must be rigid
+        """
+        xyz_new = torch.einsum('ij,nj->ni', transf_mat[:3, :3], self.xyz) + transf_mat[:3, 3]
+        
+        # TODO add feature transform: https://github.com/graphdeco-inria/gaussian-splatting/issues/176
+        features_new = self.features.clone()
+
+        opacity_new = self.opacity.clone()
+
+        scaling_new = self.scaling.clone()
+
+        quats = self.rotation                   # [N, 4] in normalized quaternions
+        rotmats = quaternion_to_matrix(quats)   # [N, 3, 3]
+        rotmats_new = torch.einsum('ij,njk->nik', transf_mat[:3, :3], rotmats)
+        quats_new = matrix_to_quaternion(rotmats_new)
+
+        # TODO add feature transform
+        return ActGaussianModelTorch(xyz_new, features_new, opacity_new, scaling_new, quats_new, self.max_sh_degree)
 
 
 @dataclass
