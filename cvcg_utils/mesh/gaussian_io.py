@@ -29,23 +29,43 @@ class ActGaussianModelTorch:
     rotation: torch.Tensor
     max_sh_degree: int
 
-    def rigid_transform(self, transf_mat: torch.Tensor):
+    def rigid_transform(self, transf_mat: torch.Tensor=None, scale: float=None):
         """
-        transf_mat: [4, 4], must be rigid
+        - returns a copy of self after a rigid transformation and isotropic scaling
+        - if both are None, simply returns a copy
+        - scale is applied after rigid transform
+
+        transf_mat: [4, 4], must be rigid transform
+        scale: float, must be positive
+
         """
-        xyz_new = torch.einsum('ij,nj->ni', transf_mat[:3, :3], self.xyz) + transf_mat[:3, 3]
+
+        if transf_mat is not None:
+            xyz_new = torch.einsum('ij,nj->ni', transf_mat[:3, :3], self.xyz) + transf_mat[:3, 3]
+        else:
+            xyz_new = self.xyz.clone()
         
+        if scale is not None:
+            assert scale > 0
+            xyz_new = xyz_new * scale
+
+
         # TODO add feature transform: https://github.com/graphdeco-inria/gaussian-splatting/issues/176
         features_new = self.features.clone()
 
         opacity_new = self.opacity.clone()
 
         scaling_new = self.scaling.clone()
+        if scale is not None:
+            scaling_new = scaling_new * scale
 
-        quats = self.rotation                   # [N, 4] in normalized quaternions
-        rotmats = quaternion_to_matrix(quats)   # [N, 3, 3]
-        rotmats_new = torch.einsum('ij,njk->nik', transf_mat[:3, :3], rotmats)
-        quats_new = matrix_to_quaternion(rotmats_new)
+        if transf_mat is not None:
+            quats = self.rotation                   # [N, 4] in normalized quaternions
+            rotmats = quaternion_to_matrix(quats)   # [N, 3, 3]
+            rotmats_new = torch.einsum('ij,njk->nik', transf_mat[:3, :3], rotmats)
+            quats_new = matrix_to_quaternion(rotmats_new)
+        else:
+            quats_new = self.rotation.clone()
 
         # TODO add feature transform
         return ActGaussianModelTorch(xyz_new, features_new, opacity_new, scaling_new, quats_new, self.max_sh_degree)
