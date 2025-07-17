@@ -459,27 +459,36 @@ class UnifiedCamera:
 
         # intrinsics
         if K is None:
-            if fov_x is None or fov_y is None:
+            assert fov_mode in ['deg', 'rad'], f'param fov_mode must be either deg or rad, now it is {fov_mode}'
+            if (fov_x is None) and (fov_y is None):
                 raise NotImplementedError("Proivde either (fov_x, fov_y) or K")
-            else:
-                assert fov_mode in ['deg', 'rad'], f'param fov_mode must be either deg or rad, now it is {fov_mode}'
+            elif fov_y is None:
+                if fov_mode == 'deg':
+                    fov_x = fov_x / 180 * math.pi
+                f_x = W / (2 * math.tan(fov_x / 2))
+                f_y = f_x
 
+            elif fov_x is None:
+                if fov_mode == 'deg':
+                    fov_y = fov_y / 180 * math.pi
+                f_y = H / (2 * math.tan(fov_y / 2))
+                f_x = f_y
+            
+            else:
                 if fov_mode == 'deg':
                     fov_x = fov_x / 180 * math.pi
                     fov_y = fov_y / 180 * math.pi
-                else:
-                    pass
-                
                 f_x = W / (2 * math.tan(fov_x / 2))
                 f_y = H / (2 * math.tan(fov_y / 2))
-                c_x = W / 2
-                c_y = H / 2
+            
+            c_x = W / 2
+            c_y = H / 2
 
-                K = np.eye(3)
-                K[0,0] = f_x
-                K[1,1] = f_y
-                K[0,2] = c_x
-                K[1,2] = c_y
+            K = np.eye(3)
+            K[0,0] = f_x
+            K[1,1] = f_y
+            K[0,2] = c_x
+            K[1,2] = c_y
         else:
             pass    # leaving K as is
 
