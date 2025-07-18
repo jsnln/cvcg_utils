@@ -1,15 +1,17 @@
 import numpy as np
 import torch
 
+from config import TrainerConfig
+
 class ExampleDataset(torch.utils.data.Dataset):
-    def __init__(self, config):
+    def __init__(self, config: TrainerConfig):
         super().__init__()
 
         self.config = config
-        self.num_items = config.num_items
+        self.num_items = 50000
 
         self.data_x = [np.random.randn(32) for i in range(config.num_items)]
-        self.data_y = [np.random.randn(1) for i in range(config.num_items)]
+        self.data_y = [np.cos(self.data_x[i].mean())[None] for i in range(self.num_items)]
 
     def __len__(self):
         return len(self.data_x)

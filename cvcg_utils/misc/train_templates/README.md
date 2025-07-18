@@ -10,6 +10,7 @@
         - [x] dataset and dataloader
         - [ ] logger
     - [x] Training tricks
+        - [ ] AMP
         - [x] warmup
         - [x] grad norm clip
         - [x] grad update skip

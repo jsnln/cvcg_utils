@@ -6,13 +6,18 @@ from glob import glob
 import shutil
 import torch
 from setup_utils.build_objects import build_objects
+from setup_utils.torch_dist_utils import init_distributed
 
 from config import TrainerConfig
+from torch.nn.parallel import DistributedDataParallel as DDP
 
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
 
-class Trainer:
+class DDPTrainer:
     def __init__(self, config: TrainerConfig):
         self.config = config
+        self.ddp_info = init_distributed()
 
         train_objects = build_objects(config)
         self.model, self.dataset, self.dataloader, self.optimized_params, self.optimizer, self.lr_scheduler, self.loss_module, self.data_preprocessor, self.grad_scaler = \
@@ -20,16 +25,16 @@ class Trainer:
 
         # this is where things differ
         # please prepare all objects according to no-dist / ddp / accelerate
-        self.model.cuda()
-        self.data_preprocessor.cuda()
-        self.loss_module.cuda()
+        self.model = DDP(self.model.to(self.ddp_info.device), device_ids=[self.ddp_info.local_rank])
+        self.data_preprocessor.to(self.ddp_info.device)
+        self.loss_module.to(self.ddp_info.device)
 
         # training setup and state
         # hyperparameters
         self.max_steps = config.max_steps
         self.grad_accum_steps = config.grad_accum_steps
         self.max_steps = self.max_steps * self.grad_accum_steps # real train steps when using gradient accumulation
-        self.total_batch_size = config.batch_size   # * world_size if using ddp
+        self.total_batch_size = config.batch_size * self.ddp_info.world_size * self.grad_accum_steps   # * world_size if using ddp
 
         # state
         self.cur_train_step = 0
@@ -82,78 +87,84 @@ class Trainer:
 
 
     def train(self):
-        self.model.activate_trainale_parameters()
+        dataloader_iter = iter(self.dataloader)
+
+        self.model.module.activate_trainale_parameters()
         
         start_epoch = int(self.cur_train_step * (self.total_batch_size / self.grad_accum_steps) // len(self.dataset) )
 
-        for cur_epoch in range(start_epoch, self.config.num_epochs):  # not exactly restarting from that iteration, a possible fix is to load sampler state
-            if self.cur_train_step >= self.max_steps:
-                print(f'\\[LOG] stopping: reached maximum number of steps {self.max_steps}')
-                break
+        while self.cur_train_step <= self.max_steps:
+            cur_epoch = int(self.cur_train_step * (self.total_batch_size / self.grad_accum_steps) // len(self.dataset) )
+            try:
+                data_batch = next(dataloader_iter)
+            except StopIteration:
+                print(f"Current Rank {self.ddp_info.local_rank} Ran out of data. Resetting dataloader epoch to {cur_epoch}; might take a while...")
+                self.dataloader.sampler.set_epoch(cur_epoch)
+                dataloader_iter = iter(self.dataloader)
+                data_batch = next(dataloader_iter)
 
-            progress_bar = tqdm(total=len(self.dataloader))
-            progress_bar.set_description(f"Epoch {cur_epoch}")
+            if self.cur_train_step >= self.max_steps: break
 
-            for local_step, data_batch in enumerate(self.dataloader):
-                if self.cur_train_step >= self.max_steps: break
+            # run model and get loss
+            data_batch = {k: v.to(self.ddp_info.device) if type(v) == torch.Tensor else v for k, v in data_batch.items()}
+            data_batch = self.data_preprocessor(data_batch)
+            model_output = self.model(data_batch)
+            total_loss, loss_dict, loss_str = self.loss_module(model_output)
 
-                # run model and get loss
-                data_batch = {k: v.cuda() if type(v) == torch.Tensor else v for k, v in data_batch.items()}
-                data_batch = self.data_preprocessor(data_batch)
-                model_output = self.model(data_batch)
-                total_loss, loss_dict, loss_str = self.loss_module(model_output)
-
-                # check whether to update gradients
-                update_grads = (self.cur_train_step + 1) % self.grad_accum_steps == 0 or self.cur_train_step == self.max_steps
+            # check whether to update gradients
+            update_grads = (self.cur_train_step + 1) % self.grad_accum_steps == 0 or self.cur_train_step == self.max_steps
+            if update_grads:
+                with self.model.no_sync(): # no sync grads for efficiency
+                    self.grad_scaler.scale(total_loss / self.grad_accum_steps).backward()
+            else:
                 self.grad_scaler.scale(total_loss / self.grad_accum_steps).backward()
 
-                skip_optimizer_step = False
-                if torch.isnan(total_loss) or torch.isinf(total_loss):
-                    print(f"NaN or Inf loss detected, skip this iteration")
-                    skip_optimizer_step = True
-                    total_loss = torch.zeros_like(total_loss)
+            skip_optimizer_step = False
+            if torch.isnan(total_loss) or torch.isinf(total_loss):
+                print(f"NaN or Inf loss detected, skip this iteration")
+                skip_optimizer_step = True
+                total_loss = torch.zeros_like(total_loss)
 
-                total_grad_norm = None
-                # Check gradient norm and update optimizer if everything is fine
-                if update_grads and (not skip_optimizer_step):
-                    # Unscales the gradients
-                    self.grad_scaler.unscale_(self.optimizer) 
-                    # For all gradients, we safely change the NaN -> 0., inf -> 1e-6, -inf -> 1e-6.
-                    with torch.no_grad():
-                        for p in self.optimized_params:
-                            if p.requires_grad and (p.grad is not None):
-                                p.grad.nan_to_num_(nan=0.0, posinf=1e-6, neginf=-1e-6)
-                
-                    total_grad_norm = 0.0
-                    if self.config.grad_clip_norm > 0:
-                        total_grad_norm = torch.nn.utils.clip_grad_norm_(self.optimized_params, max_norm=self.config.grad_clip_norm).item()
-                        if total_grad_norm > self.config.skip_grad_threshold:
-                            skip_optimizer_step = True
-                            print(f"WARNING: step {self.cur_train_step} grad norm too large {total_grad_norm} > {self.config.skip_grad_threshold}, skipping optimizer step")
+            total_grad_norm = None
+            # Check gradient norm and update optimizer if everything is fine
+            if update_grads and (not skip_optimizer_step):
+                # Unscales the gradients
+                self.grad_scaler.unscale_(self.optimizer) 
+                # For all gradients, we safely change the NaN -> 0., inf -> 1e-6, -inf -> 1e-6.
+                with torch.no_grad():
+                    for p in self.optimized_params:
+                        if p.requires_grad and (p.grad is not None):
+                            p.grad.nan_to_num_(nan=0.0, posinf=1e-6, neginf=-1e-6)
+            
+                total_grad_norm = 0.0
+                if self.config.grad_clip_norm > 0:
+                    total_grad_norm = torch.nn.utils.clip_grad_norm_(self.optimized_params, max_norm=self.config.grad_clip_norm).item()
+                    if total_grad_norm > self.config.skip_grad_threshold:
+                        skip_optimizer_step = True
+                        print(f"WARNING: step {self.cur_train_step} grad norm too large {total_grad_norm} > {self.config.skip_grad_threshold}, skipping optimizer step")
 
-                if not skip_optimizer_step:
-                    self.grad_scaler.step(self.optimizer)
-                    self.grad_scaler.update()
-                    self.cur_param_update_step += 1
-                self.cur_train_step += 1
+            if not skip_optimizer_step:
+                self.grad_scaler.step(self.optimizer)
+                self.grad_scaler.update()
+                self.cur_param_update_step += 1
+            self.cur_train_step += 1
 
-                self.lr_scheduler.step()
-                self.optimizer.zero_grad(set_to_none=True)
+            self.lr_scheduler.step()
+            self.optimizer.zero_grad(set_to_none=True)
 
-                progress_bar.update(1)
-                lr_str = f'lr: {self.lr_scheduler.get_last_lr()[0]:.3e}'
-                log_str = f'[T/U]: [{self.cur_train_step, self.cur_param_update_step}] ' + loss_str + ', ' + lr_str
-                progress_bar.set_postfix_str(log_str)
-                
+            lr_str = f'lr: {self.lr_scheduler.get_last_lr()[0]:.3e}'
+            log_str = f'[GPU{self.ddp_info.global_rank}][T/U]: [{self.cur_train_step, self.cur_param_update_step}] ' + loss_str + ', ' + lr_str
+            print(log_str)
+            
+            if self.ddp_info.is_main_process:
                 if (self.cur_train_step % self.config.save_latest_every == 0):
                     # save latest model
                     save_path = os.path.join(self.config.out_dir, 'checkpoints', f'train_state_dict_{self.cur_train_step:06d}.ckpt')
                     self.save_train_state(save_path, mark_latest=True)
-                    print(f'\\[checkpointing] saving train state to {save_path}')
+                    print(f'\\[checkpointing] saving latest train state to {save_path}')
 
                 if (self.cur_train_step in self.config.extra_save_ckpt_at) \
                     or (self.cur_train_step % self.config.save_ckpt_every == 0):
-                    
                     # save model
                     save_path = os.path.join(self.config.out_dir, 'checkpoints', f'train_state_dict_{self.cur_train_step:06d}.ckpt')
                     self.save_train_state(save_path, mark_latest=False)
@@ -188,5 +199,5 @@ class Trainer:
 
 if __name__ == '__main__':
     config = TrainerConfig()
-    trainer = Trainer(config)
+    trainer = DDPTrainer(config)
     trainer.train()

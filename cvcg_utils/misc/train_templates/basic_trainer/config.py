@@ -4,6 +4,7 @@ import torch
 class TrainerConfig:
     model_name = 'example_model'
     dataset_name = 'example_dataset'
+    dist_gpus = 1
 
     in_dim = 32
     h_dim = 64
