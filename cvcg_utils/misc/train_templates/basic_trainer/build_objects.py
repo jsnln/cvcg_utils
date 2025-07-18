@@ -81,5 +81,8 @@ def build_objects(config: TrainerConfig):
     loss_module = ExampleLoss(config)
     print(f'\\[loss info] losses and weights: {config.losses_and_weights}')
 
-    
-    return model, dataset, dataloader, optimized_params, optimizer, lr_scheduler, loss_module
+    # loss grad scaler (for fp16)
+    grad_scaler = torch.amp.GradScaler('cuda', enabled=False)
+    print(f'\\[grad scaler info] grad scaler is enabled')
+
+    return model, dataset, dataloader, optimized_params, optimizer, lr_scheduler, loss_module, grad_scaler

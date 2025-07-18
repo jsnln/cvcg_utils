@@ -25,7 +25,7 @@ def gen_camera_visualization(K: np.ndarray, c2w: np.ndarray, H: int, W: int, con
     """
     all in opencv format
     K: 3x3
-    c2w: 4x4 
+    c2w: 4x4
     """
     uv_corners_homog = np.array([
         [0, 0, 1.],
