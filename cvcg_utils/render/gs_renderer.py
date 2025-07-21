@@ -117,7 +117,7 @@ def render_gs(camera: GSCamera,
     
     return out
 
-def make_gs_rasterizer(camera: GSCamera, bg_color, scaling_modifier=1.0, active_sh_degree=0, debug=False, antialiasing=False):
+def make_gs_rasterizer(camera: GSCamera, bg_color, scaling_modifier=1.0, active_sh_degree=3, debug=False, antialiasing=False):
 
     # FoVx, FoVy, tanfovx, tanfovy, world_view_transform, projection_matrix, full_proj_transform, camera_center = camera.to_3dgs_format()
 

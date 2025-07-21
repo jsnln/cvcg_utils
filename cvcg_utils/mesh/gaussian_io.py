@@ -20,6 +20,8 @@ from dataclasses import dataclass
 from plyfile import PlyData, PlyElement
 from pytorch3d.transforms import quaternion_to_matrix, matrix_to_quaternion
 
+from cvcg_utils.render.sh_utils import rotate_sh
+
 @dataclass
 class ActGaussianModelTorch:
     xyz: torch.Tensor
@@ -37,7 +39,6 @@ class ActGaussianModelTorch:
 
         transf_mat: [4, 4], must be rigid transform
         scale: float, must be positive
-
         """
 
         if transf_mat is not None:
@@ -52,6 +53,7 @@ class ActGaussianModelTorch:
 
         # TODO add feature transform: https://github.com/graphdeco-inria/gaussian-splatting/issues/176
         features_new = self.features.clone()
+        features_new = rotate_sh(features_new, transf_mat[:3, :3])
 
         opacity_new = self.opacity.clone()
 
