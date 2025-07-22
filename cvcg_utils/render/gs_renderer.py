@@ -39,12 +39,13 @@ def render_gs(camera: GSCamera,
            scales: torch.Tensor,
            rotations: torch.Tensor,
            features: torch.Tensor,
+           active_sh_degree: int,
            cov3D_precomp: torch.Tensor = None,
            override_color = None,
            compute_cov3D_python: bool = False,
            convert_SHs_python: bool = False,
            use_trained_exp=False,
-           clip_value=False
+           clip_value=False,
            ):
     """
     Render the scene. 
@@ -60,7 +61,8 @@ def render_gs(camera: GSCamera,
     ...
     """
 
-    rasterizer = make_gs_rasterizer(camera, bg_color=torch.tensor([0., 0., 0.], device=xyz.device))
+    assert features.shape[1] >= (active_sh_degree + 1) ** 2
+    rasterizer = make_gs_rasterizer(camera, bg_color=torch.tensor([0., 0., 0.], device=xyz.device), active_sh_degree=active_sh_degree)
  
     # Create zero tensor. We will use it to make pytorch return gradients of the 2D (screen-space) means
     screenspace_points = torch.zeros_like(xyz, dtype=xyz.dtype, requires_grad=True, device=xyz.device) + 0

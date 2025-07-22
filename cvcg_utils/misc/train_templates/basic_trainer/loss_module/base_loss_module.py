@@ -1,8 +1,9 @@
 import torch
+from abc import ABC, abstractmethod
 
 from config import TrainerConfig
 
-class ExampleLoss(torch.nn.Module):
+class BaseLossModule(torch.nn.Module):
     # this inherits torch.nn.Module just in case LPIPS is used (easier for moving to device)
     # but should not contain any trainable parameters
 
@@ -16,17 +17,10 @@ class ExampleLoss(torch.nn.Module):
         self.requires_grad_(False)
         self.eval()
 
-        # loss repository
-        def mse_loss(model_output):
-            return torch.nn.functional.mse_loss(model_output['model_pred'], model_output['data_y'])
+        self.init_loss_repo()
 
-        self.loss_func_repo = {
-            'mse': mse_loss,
-        }
-
-        # used losses
-        self.loss_func_dict = {k: v for k, v in self.loss_func_repo.items() if (k in self.losses_and_weights and self.losses_and_weights[k] > 0)}
-
+    def init_loss_repo(self):
+        pass
 
     def forward(self, model_output):
         total_loss = 0.

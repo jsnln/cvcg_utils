@@ -4,7 +4,15 @@ import torch
 class TrainerConfig:
     model_name = 'example_model'
     dataset_name = 'example_dataset'
+    preprocessor_name = 'example_preprocessor'
+    loss_module_name = 'example_loss_module'
+    logger_name = 'example_logger'
     dist_gpus = 1
+
+    wandb_project_name = 'example_project'
+    wandb_exp_name = 'example_exp'
+    # wandb_mode = None
+    wandb_mode = 'offline'
 
     in_dim = 32
     h_dim = 64
@@ -19,6 +27,9 @@ class TrainerConfig:
     grad_clip_norm = 1.0
     lr_warmup_steps = 500
     lr = 1e-4
+
+    use_amp = True
+    amp_dtype: str = 'bf16'
 
     reset_state = True
     resume_from_latest: str = True  # highest priority

@@ -11,6 +11,8 @@ from setup_utils.torch_dist_utils import init_distributed
 from config import TrainerConfig
 from torch.nn.parallel import DistributedDataParallel as DDP
 
+import wandb
+
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 
@@ -20,13 +22,20 @@ class DDPTrainer:
         self.ddp_info = init_distributed()
 
         train_objects = build_objects(config)
-        self.model, self.dataset, self.dataloader, self.optimized_params, self.optimizer, self.lr_scheduler, self.loss_module, self.data_preprocessor, self.grad_scaler = \
-            train_objects.model, train_objects.dataset, train_objects.dataloader, train_objects.optimized_params, train_objects.optimizer, train_objects.lr_scheduler, train_objects.loss_module, train_objects.data_preprocessor, train_objects.grad_scaler
-
+        self.model, self.dataset, self.dataloader, self.optimized_params, self.optimizer, self.lr_scheduler, self.loss_module, self.preprocessor, self.grad_scaler, self.logger = \
+            train_objects.model, train_objects.dataset, train_objects.dataloader, train_objects.optimized_params, train_objects.optimizer, train_objects.lr_scheduler, train_objects.loss_module, train_objects.preprocessor, train_objects.grad_scaler, train_objects.logger
+        
+       
         # this is where things differ
         # please prepare all objects according to no-dist / ddp / accelerate
+        if self.ddp_info.is_main_process:
+            wandb.init(
+                project=config.wandb_project_name,
+                name=config.wandb_exp_name,
+                mode=config.wandb_mode      # offline or None
+            )
         self.model = DDP(self.model.to(self.ddp_info.device), device_ids=[self.ddp_info.local_rank])
-        self.data_preprocessor.to(self.ddp_info.device)
+        self.preprocessor.to(self.ddp_info.device)
         self.loss_module.to(self.ddp_info.device)
 
         # training setup and state
@@ -91,8 +100,6 @@ class DDPTrainer:
 
         self.model.module.activate_trainale_parameters()
         
-        start_epoch = int(self.cur_train_step * (self.total_batch_size / self.grad_accum_steps) // len(self.dataset) )
-
         while self.cur_train_step <= self.max_steps:
             cur_epoch = int(self.cur_train_step * (self.total_batch_size / self.grad_accum_steps) // len(self.dataset) )
             try:
@@ -105,11 +112,15 @@ class DDPTrainer:
 
             if self.cur_train_step >= self.max_steps: break
 
-            # run model and get loss
+
+            # ============ run model and get loss ============
             data_batch = {k: v.to(self.ddp_info.device) if type(v) == torch.Tensor else v for k, v in data_batch.items()}
-            data_batch = self.data_preprocessor(data_batch)
+            data_batch = self.preprocessor(data_batch)
             model_output = self.model(data_batch)
             total_loss, loss_dict, loss_str = self.loss_module(model_output)
+            # ============ run model and get loss ============
+
+
 
             # check whether to update gradients
             update_grads = (self.cur_train_step + 1) % self.grad_accum_steps == 0 or self.cur_train_step == self.max_steps
@@ -153,10 +164,17 @@ class DDPTrainer:
             self.optimizer.zero_grad(set_to_none=True)
 
             lr_str = f'lr: {self.lr_scheduler.get_last_lr()[0]:.3e}'
-            log_str = f'[GPU{self.ddp_info.global_rank}][T/U]: [{self.cur_train_step, self.cur_param_update_step}] ' + loss_str + ', ' + lr_str
+            log_str = f'[GPU{self.ddp_info.global_rank}][T/U]: [{self.cur_train_step}, {self.cur_param_update_step}] ' + loss_str + ', ' + lr_str
             print(log_str)
             
             if self.ddp_info.is_main_process:
+                # wandb log
+                log_dict = {}
+                log_dict.update(loss_dict)
+                log_dict['lr'] = self.lr_scheduler.get_last_lr()[0]
+                wandb.log(log_dict, step=self.cur_train_step)
+
+                # ckpt save
                 if (self.cur_train_step % self.config.save_latest_every == 0):
                     # save latest model
                     save_path = os.path.join(self.config.out_dir, 'checkpoints', f'train_state_dict_{self.cur_train_step:06d}.ckpt')

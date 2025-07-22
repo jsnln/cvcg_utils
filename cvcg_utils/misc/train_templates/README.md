@@ -1,5 +1,7 @@
 # Trainer Templates
 
+## Progress
+
 - [ ] Basic trainer
     - [x] Modulization
         - [x] model
@@ -19,3 +21,7 @@
         - [ ] model evaluate
         - [ ] wandb logging
         - [x] model saving
+
+## Tutorial
+
+1. The base classes are only used for type hints. We do not inherite them

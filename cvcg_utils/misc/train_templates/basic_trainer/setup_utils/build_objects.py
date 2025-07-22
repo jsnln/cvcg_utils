@@ -13,6 +13,13 @@ from typing import List
 
 from config import TrainerConfig
 
+# base object classes, only for type hints
+from loggers.base_logger import BaseLogger
+from loss_module.base_loss_module import BaseLossModule
+from preprocessor.base_preprocessor import BasePreprocessor
+
+
+# actual classes to be used
 from model.example_model import ExampleModel
 model_classes = {
     'example_model': ExampleModel,
@@ -23,9 +30,20 @@ dataset_classes = {
     'example_dataset': ExampleDataset,
 }
 
-from loss_module.example_loss import ExampleLoss
+from loss_module.example_loss_module import ExampleLossModule
+loss_module_classes = {
+    'example_loss_module': ExampleLossModule,
+}
 
-from preprocessor.example_processor import ExamplePreprocessor
+from preprocessor.example_preprocessor import ExamplePreprocessor
+preprocessor_classes = {
+    'example_preprocessor': ExamplePreprocessor,
+}
+
+from loggers.example_logger import ExampleLogger
+logger_classes = {
+    'example_logger': ExampleLogger,
+}
 
 def collate_fn(batch: List[dict]):
     all_keys = list(batch[0].keys())
@@ -50,6 +68,13 @@ def format_number(num):
         return f"{num / 1_000:.2f}K"
     return str(num)
 
+amp_dtype_mapping = {
+    'fp16': torch.float16,
+    'bf16': torch.bfloat16,
+    'fp32': torch.float32,
+    'tf32': torch.float32,
+}
+
 @dataclass
 class TrainObjectsCollection:
     model: torch.nn.Module = None
@@ -58,9 +83,10 @@ class TrainObjectsCollection:
     optimized_params: List[torch.Tensor] = None
     optimizer: torch.optim.Optimizer = None
     lr_scheduler: torch.optim.lr_scheduler.LRScheduler = None
-    loss_module: ExampleLoss = None
-    data_preprocessor: ExamplePreprocessor = None
+    loss_module: BaseLossModule = None
+    preprocessor: BasePreprocessor = None
     grad_scaler: torch.amp.GradScaler = None
+    logger: BaseLogger = None
 
 
 def build_objects(config: TrainerConfig) -> TrainObjectsCollection:
@@ -96,14 +122,27 @@ def build_objects(config: TrainerConfig) -> TrainObjectsCollection:
     print(f'\\[scheduler info] {config.lr_warmup_steps} warmup steps, {config.max_steps} total steps')
 
     # loss module
-    loss_module = ExampleLoss(config)
-    print(f'\\[loss info] losses and weights: {config.losses_and_weights}')
+    loss_module_cls = loss_module_classes[config.loss_module_name]
+    loss_module = loss_module_cls(config)
+    print(f'\\[loss info] loss module: {loss_module_cls}, losses and weights: {config.losses_and_weights}')
 
-    data_preprocessor = ExamplePreprocessor(config)
-    print(f'\\[preprocessor info] preprocessor')
+    preprocessor_cls = preprocessor_classes[config.preprocessor_name]
+    preprocessor = preprocessor_cls(config)
+    print(f'\\[preprocessor info] preprocessor: {preprocessor_cls}')
 
     # loss grad scaler (for fp16)
-    grad_scaler = torch.amp.GradScaler('cuda', enabled=False)
-    print(f'\\[grad scaler info] grad scaler is enabled')
+    if config.amp_dtype == 'bf16':
+        assert torch.cuda.get_device_capability()[0] >= 8, f'bf16 can only be used on gpus with compute capability >= 8.0'
 
-    return TrainObjectsCollection(model, dataset, dataloader, optimized_params, optimizer, lr_scheduler, loss_module, data_preprocessor, grad_scaler)
+    if config.use_amp:
+        used_dtype = amp_dtype_mapping[config.amp_dtype]
+
+    use_grad_scaler = (config.use_amp and (used_dtype == torch.float16))
+    grad_scaler = torch.amp.GradScaler('cuda', enabled=use_grad_scaler)
+    print(f'\\[grad scaler info] use grad scaler: {use_grad_scaler}')
+
+    # logger
+    logger_cls = logger_classes[config.logger_name]
+    logger = logger_cls(config)
+
+    return TrainObjectsCollection(model, dataset, dataloader, optimized_params, optimizer, lr_scheduler, loss_module, preprocessor, grad_scaler, logger)

@@ -8,20 +8,26 @@ import torch
 from setup_utils.build_objects import build_objects
 
 from config import TrainerConfig
-
+import wandb
 
 class Trainer:
     def __init__(self, config: TrainerConfig):
         self.config = config
 
         train_objects = build_objects(config)
-        self.model, self.dataset, self.dataloader, self.optimized_params, self.optimizer, self.lr_scheduler, self.loss_module, self.data_preprocessor, self.grad_scaler = \
-            train_objects.model, train_objects.dataset, train_objects.dataloader, train_objects.optimized_params, train_objects.optimizer, train_objects.lr_scheduler, train_objects.loss_module, train_objects.data_preprocessor, train_objects.grad_scaler
+        self.model, self.dataset, self.dataloader, self.optimized_params, self.optimizer, self.lr_scheduler, self.loss_module, self.preprocessor, self.grad_scaler, self.logger = \
+            train_objects.model, train_objects.dataset, train_objects.dataloader, train_objects.optimized_params, train_objects.optimizer, train_objects.lr_scheduler, train_objects.loss_module, train_objects.preprocessor, train_objects.grad_scaler, train_objects.logger
+        
+        wandb.init(
+            project=config.wandb_project_name,
+            name=config.wandb_exp_name,
+            mode=config.wandb_mode      # offline or None
+        )
 
         # this is where things differ
         # please prepare all objects according to no-dist / ddp / accelerate
         self.model.cuda()
-        self.data_preprocessor.cuda()
+        self.preprocessor.cuda()
         self.loss_module.cuda()
 
         # training setup and state
@@ -97,11 +103,13 @@ class Trainer:
             for local_step, data_batch in enumerate(self.dataloader):
                 if self.cur_train_step >= self.max_steps: break
 
-                # run model and get loss
+                # ============ run model and get loss ============
                 data_batch = {k: v.cuda() if type(v) == torch.Tensor else v for k, v in data_batch.items()}
-                data_batch = self.data_preprocessor(data_batch)
+                data_batch = self.preprocessor(data_batch)
                 model_output = self.model(data_batch)
                 total_loss, loss_dict, loss_str = self.loss_module(model_output)
+                # ============ run model and get loss ============
+
 
                 # check whether to update gradients
                 update_grads = (self.cur_train_step + 1) % self.grad_accum_steps == 0 or self.cur_train_step == self.max_steps
@@ -140,10 +148,17 @@ class Trainer:
                 self.lr_scheduler.step()
                 self.optimizer.zero_grad(set_to_none=True)
 
+                # console print log
                 progress_bar.update(1)
                 lr_str = f'lr: {self.lr_scheduler.get_last_lr()[0]:.3e}'
-                log_str = f'[T/U]: [{self.cur_train_step, self.cur_param_update_step}] ' + loss_str + ', ' + lr_str
+                log_str = f'[U {self.cur_param_update_step} / T {self.cur_train_step}] ' + loss_str + ', ' + lr_str
                 progress_bar.set_postfix_str(log_str)
+
+                # wandb log
+                log_dict = {}
+                log_dict.update(loss_dict)
+                log_dict['lr'] = self.lr_scheduler.get_last_lr()[0]
+                wandb.log(log_dict, step=self.cur_train_step)
                 
                 if (self.cur_train_step % self.config.save_latest_every == 0):
                     # save latest model
