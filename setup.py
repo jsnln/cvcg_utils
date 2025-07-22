@@ -19,7 +19,7 @@ setup(
               'cvcg_utils.external.nvdiffrecmc.denoiser',
               ], 
     package_data={
-        "cvcg_utils.misc.train_templates": ["basic_trainer/*.sh", "basic_trainer/*.py", "basic_trainer/dataset/*.py", "basic_trainer/loggers/*.py", "basic_trainer/loss_module/*.py", "basic_trainer/model/*.py", "basic_trainer/preprocessor/*.py", "setup_utils/*.py"],
+        "cvcg_utils.misc.train_templates": ["basic_trainer/*.sh", "basic_trainer/*.py", "basic_trainer/dataset/*.py", "basic_trainer/loggers/*.py", "basic_trainer/loss_module/*.py", "basic_trainer/model/*.py", "basic_trainer/preprocessor/*.py", "basic_trainer/setup_utils/*.py"],
         "cvcg_utils.external.nvdiffrecmc.render.renderutils": ["c_src/*"],
         "cvcg_utils.external.nvdiffrecmc.render.optixutils": ["c_src/*", "c_src/envsampling/*", "include/*", "include/internal/*"],
     }
