@@ -1,3 +1,4 @@
+from typing import List, Union
 import numpy as np
 
 
@@ -47,3 +48,28 @@ def gen_camera_visualization(K: np.ndarray, c2w: np.ndarray, H: int, W: int, con
     ])
     
     return points_world, faces
+
+def gen_camera_set_visualization(K_list: List[np.ndarray], c2w_list: List[np.ndarray], H: Union[int, List[int]], W: Union[int, List[int]], cone_height: float):
+    """
+    all in opencv format
+    K: 3x3
+    c2w: 4x4
+    """
+    def merge_mesh(verts_1, faces_1, verts_2, faces_2):
+        verts = np.concatenate([verts_1, verts_2], axis=0)
+        faces = np.concatenate([faces_1, faces_2 + len(verts_1)], axis=0)
+        return verts, faces
+
+    if isinstance(H, int):
+        H = [H] * len(K_list)
+    if isinstance(W, int):
+        W = [W] * len(K_list)
+
+    verts_all = np.zeros((0, 3))
+    faces_all = np.zeros((0, 3), dtype=int)
+    for K, c2w, curH, cur_W in zip(K_list, c2w_list, H, W):
+        points_world, faces = gen_camera_visualization(K, c2w, curH, cur_W, cone_height)
+        verts_all, faces_all = merge_mesh(verts_all, faces_all, points_world, faces)
+    
+    
+    return verts_all, faces_all
