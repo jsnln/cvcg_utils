@@ -311,71 +311,102 @@ def render_drtk_uv_textured(
     return textured_render_img, depth_img, mask, face_index_img
 
 
-# def render_drtk_uv_textured_batched_cams(
-#         batched_cams: BatchDRTKCamera,
-#         verts: torch.Tensor,
-#         faces: torch.Tensor,
-#         uv_verts: torch.Tensor,
-#         uv_faces: torch.Tensor,
-#         texture_img: torch.Tensor,
-#         make_differentiable: bool = False,
-#         flip_v: bool = True,
-#     ):
+def render_drtk_point_sprites(
+        camera: Union[DRTKCamera, BatchDRTKCamera],
+        verts: torch.Tensor,
+        vert_attrs: torch.Tensor,
+        point_size: float):
     
-#     """
-#     verts: unbatched [Nv, 3]
-#     faces: unbatched [Nf, 3], shared by items in the vertex batch
-#     uv_verts: unbatched [Nv, 3]
-#     uv_faces: unbatched [Nf, 3], shared by items in the vertex batch
-#     texture_img: [C, H, W]
+    assert len(verts.shape) == len(vert_attrs.shape)
+    if len(vert_attrs.shape) == 3 and len(verts.shape) == 3:
+            assert verts.shape[0] == vert_attrs.shape[0]
     
-#     face_attrs: unbatched [Nf, C], shared by items in the vertex batch
-#     bg_attr: [C], shared by items in the vertex batch
-#     """
-#     assert len(verts.shape) == 2
-#     assert len(faces.shape) == 2
-#     # assert len(face_attrs.shape) == 2
-#     # assert faces.shape[0] == face_attrs.shape[0]
-#     # assert face_attrs.shape[1] == bg_attr.shape[0]
-
-#     if flip_v:
-#         uv_verts = torch.stack([uv_verts[..., 0], 1 - uv_verts[..., 1]], dim=-1)
-
-#     pts_screen = batched_cams.proj_points_to_drtk_screen(verts, detach_z=False)  # [B, N, 3]
-#     batch_size = pts_screen.shape[0]
-
-#     face_index_img = drtk.rasterize(pts_screen, faces, height=batched_cams.H, width=batched_cams.W)   # [B, H, W]
-#     mask = (face_index_img > -1)  # [B, H, W]
-#     # face_index_img[~mask] = 0 # NOTE you can't do this!!! otherwise there's no edge grad
-    
-#     _, bary_img = drtk.render(pts_screen, faces, face_index_img)    # [B, 3, H, W]    
-#     uv_img = drtk.interpolate(uv_verts[None].expand(batch_size, -1, -1), uv_faces, face_index_img, bary_img)    # [B, 2, H, W]
-    
-#     textured_render_img = torch.nn.functional.grid_sample(
-#         texture_img.unsqueeze(0).expand(batch_size, -1, -1, -1),
-#         (uv_img * 2 - 1).permute(0,2,3,1),
-#         align_corners=False,
-#         padding_mode='border',
-#     )   # [B, C, H, W]
-#     textured_render_img = textured_render_img * mask[:, None]
-
-#     if make_differentiable:
-#         textured_render_img = drtk.edge_grad_estimator(
-#             pts_screen,     # verts for rasterization
-#             faces,          # faces
-#             bary_img,       # barys
-#             textured_render_img, # rendered image
-#             face_index_img)  # face indices
+    batched = True      # whether at least one of `camera` or `verts` is batched
+    if isinstance(camera, BatchDRTKCamera):     # if `camera` is batched, then either `verts` is unbatched or has the same batch size
+        assert len(verts.shape) == 2 or \
+              (len(verts.shape) == 3 and verts.shape[0] == camera.batch_size)
         
-#         mask = drtk.edge_grad_estimator(
-#             pts_screen,     # verts for rasterization
-#             faces,          # faces
-#             bary_img,       # barys
-#             mask.float()[:, None],  # rendered image
-#             face_index_img, # face indices
-#             ).squeeze(1)    # [B, H, W]
+        # additionally check whether `vert_attrs` is batched
+        if len(vert_attrs.shape) == 2:
+            vert_attrs = vert_attrs[None].expand(camera.batch_size, -1, -1)
 
-#     return textured_render_img, mask, face_index_img
+    elif isinstance(camera, DRTKCamera):        # if `camera` is unbatched, then `verts` can be batched
+        if len(verts.shape) == 2:
+            batched = False
+            verts = verts[None]
+            vert_attrs = vert_attrs[None]
+
+    assert point_size > 0.
+
+    pts_screen = camera.proj_points_to_drtk_screen(verts, detach_z=False)  # [B, N, 3], xy are in pixel coords, z is the actual depth
+    B, N, _ = pts_screen.size()
+    _, _, C = vert_attrs.size()
+
+    focal_avg = (camera.K[..., 0, 0] + camera.K[..., 1, 1]) / 2 # [B,] for computing scale change of point size
+
+    point_size_screen = torch.ones(pts_screen.shape[:2], dtype=pts_screen.dtype, device=pts_screen.device) * point_size # [B, N]
+    point_size_screen = point_size_screen / pts_screen[..., 2] * focal_avg # [B, N]
+
+    single_sprite_v = torch.tensor([[-1.,  1.],
+                                    [ 1.,  1.],
+                                    [ 1., -1.],
+                                    [-1., -1.]], dtype=pts_screen.dtype, device=pts_screen.device)  # [4, 2]
+    single_sprite_f = torch.tensor([[0, 1, 2],
+                                    [0, 2, 3]], dtype=torch.int, device=pts_screen.device)          # [2, 3]
+    
+
+    sprite_v_all = single_sprite_v[None, None] * point_size_screen[..., None, None]     # [1, 1, 4, 2] * [B, N, 1, 1] => [B, N, 4, 2]
+    sprite_v_all = sprite_v_all + pts_screen[:, :, None, :2]            # [B, N, 4, 2]  + [B, N, 1, 2] => [B, N, 4, 2]
+    sprite_z_all = pts_screen[..., 2][..., None, None].expand(-1, -1, 4, -1)    # [B, N] => [B, N, 4, 1]
+    sprite_v_all = torch.cat([sprite_v_all, sprite_z_all], dim=-1)              # [B, N, 4, 3]
+
+    primitive_index_shift = torch.arange(0, 4 * sprite_v_all.shape[1]-1, 4,
+                                         dtype=torch.int, device=pts_screen.device)  # [N]
+    sprite_f_all = single_sprite_f[None] + primitive_index_shift[..., None, None]   # [1, 2, 3] + [N, 1, 1] => [N, 2, 3]
+
+    sprite_v_all = sprite_v_all.reshape(sprite_v_all.shape[0], -1, 3)   # [B, N*4, 3]
+    sprite_f_all = sprite_f_all.reshape(-1, 3)                          # [N*2, 3]
+
+    sprite_attr_all = vert_attrs[:, :, None].expand(-1, -1, 4, -1).reshape(B, -1, C)      # [B, N, C] => [B, N, 4, C] => [B, N*4, C], this is aligned with sprite_v (for batching)
+
+    face_index_img = drtk.rasterize(sprite_v_all, sprite_f_all, height=camera.H, width=camera.W)   # [B, H, W]
+    mask = (face_index_img > -1)  # [B, H, W]
+    
+    depth_img, bary_img = drtk.render(sprite_v_all, sprite_f_all, face_index_img)    # [B, 3, H, W]
+    vert_attr_img = drtk.interpolate(sprite_attr_all, sprite_f_all, face_index_img, bary_img)   # [B, C, H, W]
+    
+
+    vert_attr_img = vert_attr_img * mask[:, None]
+
+    # make_differentiable = False
+    # if make_differentiable:
+    #     vert_attr_img = drtk.edge_grad_estimator(
+    #         pts_screen,     # verts for rasterization
+    #         faces,          # faces
+    #         bary_img,       # barys
+    #         vert_attr_img, # rendered image
+    #         face_index_img)  # face indices
+        
+    #     mask = drtk.edge_grad_estimator(
+    #         pts_screen,     # verts for rasterization
+    #         faces,          # faces
+    #         bary_img,       # barys
+    #         mask.float()[:, None],  # rendered image
+    #         face_index_img, # face indices
+    #         ).squeeze(1)    # [B, H, W]
+        
+    if not batched:
+        vert_attr_img = vert_attr_img.squeeze(0)
+        depth_img = depth_img.squeeze(0)
+        mask = mask.squeeze(0)
+        face_index_img = face_index_img.squeeze(0)
+
+    return vert_attr_img, depth_img, mask, face_index_img
+    
+
+
+
+
 
 if __name__ == '__main__':
 
