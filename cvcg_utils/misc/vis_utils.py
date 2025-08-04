@@ -30,9 +30,9 @@ def gen_camera_visualization(K: np.ndarray, c2w: np.ndarray, H: int, W: int, con
     """
     uv_corners_homog = np.array([
         [0, 0, 1.],
-        [H, 0, 1.],
-        [H, W, 1.],
-        [0, W, 1.],
+        [W, 0, 1.],
+        [W, H, 1.],
+        [0, H, 1.],
     ])
     corners_cam = np.einsum('ij,nj->ni', np.linalg.inv(K), uv_corners_homog) * cone_height
     points_cam = np.pad(corners_cam, ((1,0), (0,0)), constant_values=0)   # [5, 3]
@@ -67,8 +67,8 @@ def gen_camera_set_visualization(K_list: List[np.ndarray], c2w_list: List[np.nda
 
     verts_all = np.zeros((0, 3))
     faces_all = np.zeros((0, 3), dtype=int)
-    for K, c2w, curH, cur_W in zip(K_list, c2w_list, H, W):
-        points_world, faces = gen_camera_visualization(K, c2w, curH, cur_W, cone_height)
+    for K, c2w, curH, curW in zip(K_list, c2w_list, H, W):
+        points_world, faces = gen_camera_visualization(K, c2w, curH, curW, cone_height)
         verts_all, faces_all = merge_mesh(verts_all, faces_all, points_world, faces)
     
     
