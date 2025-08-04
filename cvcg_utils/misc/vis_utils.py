@@ -72,7 +72,7 @@ def gen_camera_set_visualization(K_list: List[np.ndarray], c2w_list: List[np.nda
         verts_all, faces_all = merge_mesh(verts_all, faces_all, points_world, faces)
 
     cmap = plt.colormaps['rainbow']
-    v_colors = cmap(np.linspace(0, 1, len(K_list)))[:, :3] # [N, 3]
-    v_colors = np.broadcast_to(v_colors[:, None], (len(K_list), 5, 3)).reshape(-1, 3)
+    v_colors = cmap(np.linspace(0, 1, len(K_list)))[:, :3] * 255 # [N, 3]
+    v_colors = np.broadcast_to(v_colors[:, None], (len(K_list), 5, 3)).astype(np.uint8).reshape(-1, 3)
     
     return verts_all, faces_all, v_colors
