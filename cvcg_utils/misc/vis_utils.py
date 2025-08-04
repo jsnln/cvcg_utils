@@ -1,6 +1,6 @@
 from typing import List, Union
 import numpy as np
-
+import matplotlib.pyplot as plt
 
 def gen_line_visualization(start: np.ndarray, end: np.ndarray):
     """
@@ -70,6 +70,9 @@ def gen_camera_set_visualization(K_list: List[np.ndarray], c2w_list: List[np.nda
     for K, c2w, curH, curW in zip(K_list, c2w_list, H, W):
         points_world, faces = gen_camera_visualization(K, c2w, curH, curW, cone_height)
         verts_all, faces_all = merge_mesh(verts_all, faces_all, points_world, faces)
+
+    cmap = plt.colormaps['rainbow']
+    v_colors = cmap(np.linspace(0, 1, len(K_list)))[:, :3] # [N, 3]
+    v_colors = np.broadcast_to(v_colors[:, None], (len(K_list), 5, 3)).reshape(-1, 3)
     
-    
-    return verts_all, faces_all
+    return verts_all, faces_all, v_colors
