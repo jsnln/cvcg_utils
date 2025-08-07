@@ -434,6 +434,34 @@ class UnifiedCamera:
 
         # full projection
         return np.einsum('ij,nj->ni', self.R, pts) + self.T
+    
+    def make_screen_coords(self, homogeneous):
+        H, W = self.H, self.W
+        u_axis = np.linspace(0, W-1, W) + 0.5
+        v_axis = np.linspace(0, H-1, H) + 0.5
+        uv_img = np.stack([np.broadcast_to(u_axis[None, :], (H, W)),
+                           np.broadcast_to(v_axis[:, None], (H, W))], axis=-1)
+        
+        if homogeneous:
+            uv_img = np.pad(uv_img, ((0,0), (0,0), (0,1)), constant_values=1.)
+        
+        return uv_img
+    
+    def unproject_depth(self, depth_img, target_system):
+        """
+        depth_img: [H, W]
+        """
+        assert target_system in ['cam', 'world']
+        
+        uv_img = self.make_screen_coords(homogeneous=True)  # [H, W, 3]
+        xyz_cam = np.einsum('ij,hwj->hwi', np.linalg.inv(self.K), uv_img * depth_img[..., None])
+        
+        if target_system == 'cam':
+            return xyz_cam
+        
+        xyz_world = np.einsum('ij,hwj->hwi', self.c2w[:3, :3], xyz_cam) + self.c2w[:3, 3]
+        return xyz_world
+
 
     @classmethod
     def from_lookat(cls, center, lookat, up, fov_x, fov_y, fov_mode, K, H, W, name=None) -> Self:
@@ -443,7 +471,6 @@ class UnifiedCamera:
         OpenCV convention w2c matrix
         priority: front > up > right
         """
-        
         
         # camera pose
         front = lookat - center

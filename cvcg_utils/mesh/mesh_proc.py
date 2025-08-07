@@ -1,3 +1,4 @@
+from typing import Union
 import torch
 import torch.nn.functional as F
 import igl
@@ -156,4 +157,108 @@ def get_mesh_eigenfunctions(verts, faces, k):
     assert np.all(np.max(eigenfunctions, axis=0) != np.min(eigenfunctions, axis=0))
 
     return eigenfunctions, eigenvalues
+
+def remove_unreferenced(vert_attrs: Union[np.ndarray, torch.Tensor],
+                        faces: Union[np.ndarray, torch.Tensor],
+                        vert_list_mask: Union[np.ndarray, torch.Tensor]=None,
+                        face_list_mask: Union[np.ndarray, torch.Tensor]=None):
+    """
+    vert_attrs: [Nv, C]
+    faces: [Nf, 3]
+
+    vert_list_mask: [Nv], bool
+    face_list_mask: [Nf], bool
+
+    out:
+    - vert_attrs_cleaned
+    - faces_cleaned
+
+    explanation:
+    - a face will be removed if:
+      (1) it's False in face_list_mask
+      (2) any of its vertices is False in vert_list_mask
+    - a vert will be removed if:
+      (1) it's not referenced by any face after face masking
+    """
+    if isinstance(vert_attrs, np.ndarray):
+        return remove_unreferenced_np(vert_attrs, faces, vert_list_mask, face_list_mask)
+    elif isinstance(vert_attrs, torch.Tensor):
+        return remove_unreferenced_th(vert_attrs, faces, vert_list_mask, face_list_mask)
+    else:
+        raise NotImplementedError(f'function not implemented for {type(vert_attrs)}')
+
+def remove_unreferenced_th(vert_attrs: torch.Tensor, faces: torch.Tensor, vert_list_mask: torch.Tensor=None, face_list_mask: torch.Tensor=None):
+    if vert_list_mask is None and face_list_mask is None:
+        return vert_attrs.clone(), faces.clone()    # because the function below will return copies, we also return copies here just to be consistent
+
+    face_mask_final = torch.ones_like(faces[:, 0], dtype=torch.bool)
+    if face_list_mask is not None:
+        face_mask_final = face_mask_final & face_list_mask
+    if vert_list_mask is not None:
+        face_mask_by_verts = vert_list_mask[faces]  # [Nf, 3], bool
+        face_mask_final = face_mask_final & face_mask_by_verts.all(dim=-1)
+    
+    referenced_faces_ori_vidx = faces[face_mask_final]  # remaining faces, but holding old vertex indices
+    referenced_vert_mask = torch.zeros_like(vert_attrs[:, 0], dtype=torch.bool)  # [Nv], bool, a mask denoting referenced verts after masking
+    referenced_vert_mask[referenced_faces_ori_vidx] = True
+
+    # final vert attrs to be returned
+    vert_attrs_final = vert_attrs[referenced_vert_mask]  # [Nv_new, 3]
+    num_verts_final = vert_attrs_final.shape[0] # Nv_new
+
+    vert_index_mapping = -1 * torch.ones_like(vert_attrs[:, 0], dtype=torch.int64)  # [Nv], contains new vert idx. If unreferenced, it is -1
+    vert_index_mapping[referenced_vert_mask] = torch.arange(num_verts_final, device=vert_index_mapping.device, dtype=vert_index_mapping.dtype)
+
+    faces_final = vert_index_mapping[referenced_faces_ori_vidx]
+
+
+    assert (faces_final >= 0).all()
+
+    return vert_attrs_final, faces_final.to(faces.dtype)
+
+
+
+def remove_unreferenced_np(vert_attrs: np.ndarray, faces: np.ndarray, vert_list_mask: np.ndarray=None, face_list_mask: np.ndarray=None):
+    if vert_list_mask is None and face_list_mask is None:
+        return vert_attrs.copy(), faces.copy()    # because the function below will return copies, we also return copies here just to be consistent
+
+    face_mask_final = np.ones_like(faces[:, 0], dtype=bool)
+    if face_list_mask is not None:
+        face_mask_final = face_mask_final & face_list_mask
+    if vert_list_mask is not None:
+        face_mask_by_verts = vert_list_mask[faces]  # [Nf, 3], bool
+        face_mask_final = face_mask_final & face_mask_by_verts.all(axis=-1)
+    
+    referenced_faces_ori_vidx = faces[face_mask_final]  # remaining faces, but holding old vertex indices
+    referenced_vert_mask = np.zeros_like(vert_attrs[:, 0], dtype=bool)  # [Nv], bool, a mask denoting referenced verts after masking
+    referenced_vert_mask[referenced_faces_ori_vidx] = True
+
+    # final vert attrs to be returned
+    vert_attrs_final = vert_attrs[referenced_vert_mask]  # [Nv_new, 3]
+    num_verts_final = vert_attrs_final.shape[0] # Nv_new
+
+    vert_index_mapping = -1 * np.ones_like(vert_attrs[:, 0], dtype=int)  # [Nv], contains new vert idx. If unreferenced, it is -1
+    vert_index_mapping[referenced_vert_mask] = np.arange(num_verts_final, dtype=vert_index_mapping.dtype)
+
+    faces_final = vert_index_mapping[referenced_faces_ori_vidx]
+
+    assert (faces_final >= 0).all()
+
+    return vert_attrs_final, faces_final.astype(faces.dtype)
+
+
+
+
+if __name__ == '__main__':
+    verts = torch.tensor([0., 1., 2., 3., 4.]).reshape(5, 1).numpy()
+    faces = torch.tensor([[0, 1, 2], [0, 2, 3], [0, 3, 4]]).numpy()
+    vmask = None
+    # vmask = torch.tensor([1, 0, 1, 1, 1]).bool()
+    # fmask = None
+    fmask = torch.tensor([1, 0, 1]).bool().numpy()
+
+
+    verts_new, faces_new = remove_unreferenced(verts, faces, vmask, fmask)
+
+    print(verts_new, faces_new)
 
