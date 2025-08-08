@@ -39,7 +39,7 @@ def render_drtk_face_attr(
     assert len(face_attrs.shape) == 2
     assert faces.shape[0] == face_attrs.shape[0]
 
-    pts_screen = camera.proj_points_to_drtk_screen(verts, detach_z=False, allow_neg_depth=allow_neg_depth)  # [B, N, 3]
+    pts_screen = camera.proj_points_to_drtk_screen(verts, detach_z=False)  # [B, N, 3]
 
     face_index_img = drtk.rasterize(pts_screen, faces, height=camera.H, width=camera.W)   # [B, H, W]
     mask = (face_index_img > -1)  # [B, H, W]
@@ -121,7 +121,7 @@ def render_drtk_vert_attr(
     assert len(attr_faces.shape) == 2
     assert faces.shape[0] == attr_faces.shape[0]
 
-    pts_screen = camera.proj_points_to_drtk_screen(verts, detach_z=False, allow_neg_depth=allow_neg_depth)  # [B, N, 3]
+    pts_screen = camera.proj_points_to_drtk_screen(verts, detach_z=False)  # [B, N, 3]
 
     face_index_img = drtk.rasterize(pts_screen, faces, height=camera.H, width=camera.W)   # [B, H, W]
     mask = (face_index_img > -1)  # [B, H, W]
@@ -185,7 +185,7 @@ def render_drtk_shaded(
 
     assert len(faces.shape) == 2
 
-    pts_screen = camera.proj_points_to_drtk_screen(verts, detach_z=False, allow_neg_depth=allow_neg_depth)  # [B, N, 3]
+    pts_screen = camera.proj_points_to_drtk_screen(verts, detach_z=False)  # [B, N, 3]
 
     face_index_img = drtk.rasterize(pts_screen, faces, height=camera.H, width=camera.W)   # [B, H, W]
     mask = (face_index_img > -1)  # [B, H, W]
@@ -273,7 +273,7 @@ def render_drtk_uv_textured(
     if flip_v:
         uv_verts = torch.stack([uv_verts[..., 0], 1 - uv_verts[..., 1]], dim=-1)
 
-    pts_screen = camera.proj_points_to_drtk_screen(verts, detach_z=False, allow_neg_depth=allow_neg_depth)  # [B, N, 3]
+    pts_screen = camera.proj_points_to_drtk_screen(verts, detach_z=False)  # [B, N, 3]
 
     face_index_img = drtk.rasterize(pts_screen, faces, height=camera.H, width=camera.W)   # [B, H, W]
     mask = (face_index_img > -1)  # [B, H, W]
@@ -346,7 +346,7 @@ def render_drtk_point_sprites(
 
     assert point_size > 0.
 
-    pts_screen = camera.proj_points_to_drtk_screen(verts, detach_z=False, allow_neg_depth=allow_neg_depth)  # [B, N, 3], xy are in pixel coords, z is the actual depth
+    pts_screen = camera.proj_points_to_drtk_screen(verts, detach_z=False)  # [B, N, 3], xy are in pixel coords, z is the actual depth
     B, N, _ = pts_screen.size()
     _, _, C = vert_attrs.size()
 

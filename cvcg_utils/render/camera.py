@@ -135,7 +135,7 @@ class DRTKCamera(torch.nn.Module):
         
         return cam_xyz_img, world_xyz_img
 
-    def proj_points_to_drtk_screen(self, pts: torch.Tensor, detach_z: bool, allow_neg_depth: bool=False):
+    def proj_points_to_drtk_screen(self, pts: torch.Tensor, detach_z: bool):
         """
         pts: [B, N, 3]
 
@@ -164,9 +164,6 @@ class DRTKCamera(torch.nn.Module):
         pts_x_screen = (pts_clip[..., 0] + 1) / 2 * self.W - 0.5
         pts_y_screen = (1 - pts_clip[..., 1]) / 2 * self.H - 0.5
         pts_z_screen = -pts_cam_z   # actual z coords
-        
-        if allow_neg_depth:
-            pts_z_screen = pts_z_screen.clip(min=self.znear)   # actual z coords
 
         pts_screen = torch.stack([pts_x_screen,
                                   pts_y_screen,
@@ -250,10 +247,9 @@ class BatchDRTKCamera(torch.nn.Module):
     def batch_size(self) -> int:
         return self.proj_mat.shape[0]
 
-    def proj_points_to_drtk_screen(self, pts: torch.Tensor, detach_z: bool, allow_neg_depth: bool=False):
+    def proj_points_to_drtk_screen(self, pts: torch.Tensor, detach_z: bool):
         """
         pts: [B, N, 3] or [N, 3]
-        allow_neg_depth: if true, the depth map will hold clip-space z coordinates. note that drtk clips and z < 0. When you use real depth it might be problematic
 
         out: [B, N, 3], batched DRTK screen space coordinates, (-0.5, -0.5) to (W-0.5, H-0.5)
         """
@@ -284,8 +280,6 @@ class BatchDRTKCamera(torch.nn.Module):
         pts_x_screen = (pts_clip[..., 0] + 1) / 2 * self.W - 0.5
         pts_y_screen = (1 - pts_clip[..., 1]) / 2 * self.H - 0.5
         pts_z_screen = -pts_cam_z   # actual z coords
-        if allow_neg_depth:
-            pts_z_screen = pts_z_screen.clip(min=self.znear)   # actual z coords
 
         pts_screen = torch.stack([pts_x_screen,
                                   pts_y_screen,
