@@ -386,15 +386,28 @@ class UnifiedCamera:
     def center(self):
         return self.c2w[:3, 3]
 
-    def proj_world2camera_opencv(self, pts: np.ndarray):
+    def proj_points_to_camera_space(self, pts: np.ndarray):
         """
-        pts: [B, N, 3]
+        pts: [N, 3]
         """
         assert len(pts.shape) == 2
         assert pts.shape[1] == 3
 
         # full projection
         return np.einsum('ij,nj->ni', self.R, pts) + self.T
+    
+    def proj_points_to_screen(self, points: np.ndarray):
+        """
+        points: [N, 3]
+        """
+        points_cam = self.proj_points_to_camera_space(points)
+        assert len(points.shape) == 2
+        assert points.shape[1] == 3
+
+        points_pix = np.einsum('ij,nj->ni', self.K, points_cam)
+        points_pix = points_pix[:, :2] / points_pix[:, [2]]
+        return points_pix
+
     
     def make_screen_coords(self, homogeneous):
         H, W = self.H, self.W
