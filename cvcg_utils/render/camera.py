@@ -71,7 +71,7 @@ def opencv_intrinsics_to_opengl_projection(znear, zfar, K=None, img_h=None, img_
     return P
 
 class DRTKCamera(torch.nn.Module):
-    def __init__(self, proj_mat, w2c_mat, H, W, K=None):
+    def __init__(self, proj_mat, w2c_mat, H, W, znear, zfar, K=None):
         """
         proj and w2c follows OpenGL convention
 
@@ -83,6 +83,8 @@ class DRTKCamera(torch.nn.Module):
         self.H = H
         self.W = W
         self.K = torch.nn.Buffer(torch.from_numpy(K)) if K is not None else None
+        self.znear = znear
+        self.zfar = zfar
 
     def proj_points_to_camera(self, pts: torch.Tensor):
         """
@@ -133,7 +135,7 @@ class DRTKCamera(torch.nn.Module):
         
         return cam_xyz_img, world_xyz_img
 
-    def proj_points_to_drtk_screen(self, pts: torch.Tensor, detach_z: bool, use_clip_depth: bool=False):
+    def proj_points_to_drtk_screen(self, pts: torch.Tensor, detach_z: bool, allow_neg_depth: bool=False):
         """
         pts: [B, N, 3]
 
@@ -161,10 +163,10 @@ class DRTKCamera(torch.nn.Module):
         # clip space (OpenGL) to screen space (DRTK)
         pts_x_screen = (pts_clip[..., 0] + 1) / 2 * self.W - 0.5
         pts_y_screen = (1 - pts_clip[..., 1]) / 2 * self.H - 0.5
-        if use_clip_depth:
-            pts_z_screen = pts_clip[..., 2]   # OpenGL clip space z coords
-        else:
-            pts_z_screen = -pts_cam_z   # actual z coords
+        pts_z_screen = -pts_cam_z   # actual z coords
+        
+        if allow_neg_depth:
+            pts_z_screen = pts_z_screen.clip(min=self.znear)   # actual z coords
 
         pts_screen = torch.stack([pts_x_screen,
                                   pts_y_screen,
@@ -226,6 +228,8 @@ class BatchDRTKCamera(torch.nn.Module):
 
         self.H = cameras[0].H
         self.W = cameras[0].W
+        self.znear = cameras[0].znear
+        self.zfar = cameras[0].zfar
 
         proj_mats = []
         w2c_mats = []
@@ -233,6 +237,8 @@ class BatchDRTKCamera(torch.nn.Module):
         for cam in cameras:
             assert cam.H == self.H
             assert cam.W == self.W
+            assert cam.znear == self.znear
+            assert cam.zfar == self.zfar
 
             proj_mats.append(cam.proj_mat.clone())
             w2c_mats.append(cam.w2c_mat.clone())
@@ -244,10 +250,10 @@ class BatchDRTKCamera(torch.nn.Module):
     def batch_size(self) -> int:
         return self.proj_mat.shape[0]
 
-    def proj_points_to_drtk_screen(self, pts: torch.Tensor, detach_z: bool, use_clip_depth: bool=False):
+    def proj_points_to_drtk_screen(self, pts: torch.Tensor, detach_z: bool, allow_neg_depth: bool=False):
         """
         pts: [B, N, 3] or [N, 3]
-        use_clip_depth: if true, the depth map will hold clip-space z coordinates. note that drtk clips and z < 0. When you use real depth it might be problematic
+        allow_neg_depth: if true, the depth map will hold clip-space z coordinates. note that drtk clips and z < 0. When you use real depth it might be problematic
 
         out: [B, N, 3], batched DRTK screen space coordinates, (-0.5, -0.5) to (W-0.5, H-0.5)
         """
@@ -277,10 +283,9 @@ class BatchDRTKCamera(torch.nn.Module):
         # clip space (OpenGL) to screen space (DRTK)
         pts_x_screen = (pts_clip[..., 0] + 1) / 2 * self.W - 0.5
         pts_y_screen = (1 - pts_clip[..., 1]) / 2 * self.H - 0.5
-        if use_clip_depth:
-            pts_z_screen = pts_clip[..., 2]   # OpenGL clip space z coords
-        else:
-            pts_z_screen = -pts_cam_z   # actual z coords
+        pts_z_screen = -pts_cam_z   # actual z coords
+        if allow_neg_depth:
+            pts_z_screen = pts_z_screen.clip(min=self.znear)   # actual z coords
 
         pts_screen = torch.stack([pts_x_screen,
                                   pts_y_screen,
@@ -553,7 +558,7 @@ class UnifiedCamera:
         # OpenCV intrinsics to OpenGL projection
         proj_opengl = opencv_intrinsics_to_opengl_projection(znear=znear, zfar=zfar, K = self.K, img_w = self.W, img_h = self.H)
         
-        return DRTKCamera(proj_opengl, w2c_opengl, self.H, self.W, self.K)
+        return DRTKCamera(proj_opengl, w2c_opengl, self.H, self.W, znear, zfar, self.K)
     
     def to_nvdiffrecmc_format(self, znear=0.001, zfar=100) -> NvdiffrecmcCamera:
         # OpenCV extrinsics to OpenGL world2view
