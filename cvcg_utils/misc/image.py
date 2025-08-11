@@ -30,7 +30,7 @@ def write_rgb(fn: str, rgb: np.ndarray):
     assert rgb.dtype == np.uint8
     assert len(rgb.shape) == 3
     assert rgb.shape[2] == 3
-    assert os.path.splitext(fn)[-1] in ['.png', '.jpg', '.jpeg']
+    assert os.path.splitext(fn)[-1].lower() in ['.png', '.jpg', '.jpeg']
 
     bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
     cv2.imwrite(fn, bgr)
@@ -40,7 +40,7 @@ def write_rgba(fn: str, rgba: np.ndarray):
     assert rgba.dtype == np.uint8
     assert len(rgba.shape) == 3
     assert rgba.shape[2] == 4
-    assert os.path.splitext(fn)[-1] in ['.png', '.jpg', '.jpeg']
+    assert os.path.splitext(fn)[-1].lower() in ['.png', '.jpg', '.jpeg']
 
     bgra = cv2.cvtColor(rgba, cv2.COLOR_RGBA2BGRA)
     cv2.imwrite(fn, bgra)
@@ -49,7 +49,7 @@ def write_rgb_uint16(fn: str, rgb: np.ndarray):
     assert rgb.dtype == np.uint16
     assert len(rgb.shape) == 3
     assert rgb.shape[2] == 3
-    assert os.path.splitext(fn)[-1] in ['.png', '.jpg', '.jpeg']
+    assert os.path.splitext(fn)[-1].lower() in ['.png', '.jpg', '.jpeg']
 
     bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
     cv2.imwrite(fn, bgr)
@@ -58,7 +58,7 @@ def write_rgb_uint16(fn: str, rgb: np.ndarray):
 def write_grayscale_uint16(fn: str, grayscale: np.ndarray):
     assert grayscale.dtype == np.uint16
     assert len(grayscale.shape) == 2
-    assert os.path.splitext(fn)[-1] in ['.png']
+    assert os.path.splitext(fn)[-1].lower() in ['.png']
 
     cv2.imwrite(fn, grayscale)
 
@@ -67,7 +67,7 @@ def write_rgba_uint16(fn: str, rgba: np.ndarray):
     assert rgba.dtype == np.uint16
     assert len(rgba.shape) == 3
     assert rgba.shape[2] == 4
-    assert os.path.splitext(fn)[-1] in ['.png', '.jpg', '.jpeg']
+    assert os.path.splitext(fn)[-1].lower() in ['.png', '.jpg', '.jpeg']
 
     bgra = cv2.cvtColor(rgba, cv2.COLOR_RGBA2BGRA)
     cv2.imwrite(fn, bgra)
@@ -85,21 +85,21 @@ def write_bgr(fn: str, bgr: np.ndarray):
     assert bgr.dtype == np.uint8
     assert len(bgr.shape) == 3
     assert bgr.shape[2] == 3
-    assert os.path.splitext(fn)[-1] in ['.png', '.jpg', '.jpeg']
+    assert os.path.splitext(fn)[-1].lower() in ['.png', '.jpg', '.jpeg']
 
     cv2.imwrite(fn, bgr)
 
 def write_grayscale_exr(fn: str, grayscale: np.ndarray):
     assert grayscale.dtype == np.float32
     assert len(grayscale.shape) == 2
-    assert os.path.splitext(fn)[-1] in ['.exr']
+    assert os.path.splitext(fn)[-1].lower() in ['.exr']
 
     cv2.imwrite(fn, grayscale)
 
 def write_grayscale(fn: str, grayscale: np.ndarray):
     assert grayscale.dtype == np.uint8
     assert len(grayscale.shape) == 2
-    assert os.path.splitext(fn)[-1] in ['.png', '.jpg', '.jpeg']
+    assert os.path.splitext(fn)[-1].lower() in ['.png', '.jpg', '.jpeg']
 
     cv2.imwrite(fn, grayscale)
 
