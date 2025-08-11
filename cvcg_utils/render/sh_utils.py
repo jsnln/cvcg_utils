@@ -56,19 +56,27 @@ C4 = [
 
 def rotate_sh(shs, rotmat):
     ## rotate shs
+    assert shs.shape[1] in [1, 4, 9, 16]
+
     rotmat = rotmat.cpu()
     P = torch.tensor([[0, 0, 1], [1, 0, 0], [0, 1, 0]]).float() # switch axes: yzx -> xyz
     rotmat = torch.linalg.inv(P) @ rotmat @ P
     rot_angles = o3._rotation.matrix_to_angles(rotmat)
+    
     # Construction coefficient
-    D_1 = o3.wigner_D(1, rot_angles[0], -rot_angles[1], rot_angles[2]).cuda()
-    D_2 = o3.wigner_D(2, rot_angles[0], -rot_angles[1], rot_angles[2]).cuda()
-    D_3 = o3.wigner_D(3, rot_angles[0], -rot_angles[1], rot_angles[2]).cuda()
-
     # rotation of the shs features
-    shs[:, 1:4] = D_1 @ shs[:, 1:4]
-    shs[:, 4:9] = D_2 @ shs[:, 4:9]
-    shs[:, 9:16] = D_3 @ shs[:, 9:16]
+    if shs.shape[1] >= 4:
+        D_1 = o3.wigner_D(1, rot_angles[0], -rot_angles[1], rot_angles[2]).cuda()
+        shs[:, 1:4] = D_1 @ shs[:, 1:4]
+    
+    if shs.shape[1] >= 9:
+        D_2 = o3.wigner_D(2, rot_angles[0], -rot_angles[1], rot_angles[2]).cuda()
+        shs[:, 4:9] = D_2 @ shs[:, 4:9]
+    
+    if shs.shape[1] >= 16:
+        D_3 = o3.wigner_D(3, rot_angles[0], -rot_angles[1], rot_angles[2]).cuda()
+        shs[:, 9:16] = D_3 @ shs[:, 9:16]
+    
     return shs
 
 def eval_sh(deg, sh, dirs):
