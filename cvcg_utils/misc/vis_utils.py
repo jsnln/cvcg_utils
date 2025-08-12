@@ -30,10 +30,10 @@ def gen_quad_cone(K: np.ndarray, c2w: np.ndarray, quad_corners: np.ndarray, cone
     all in opencv format
     K: 3x3
     c2w: 4x4
-    quad_corners: [4, 2], top-left, top right, bottom right, bottom left
+    quad_corners: [4, 2], top-left, top right, bottom right, bottom left, in pixel coordinates
     """
     uv_corners_homog = np.pad(quad_corners, ((0,0), (0,1)), constant_values=1)
-    
+
     corners_cam = np.einsum('ij,nj->ni', np.linalg.inv(K), uv_corners_homog) * cone_height
     points_cam = np.pad(corners_cam, ((1,0), (0,0)), constant_values=0)   # [5, 3]
     points_world = np.einsum('ij,nj->ni', c2w[:3, :3], points_cam) + c2w[:3, 3]

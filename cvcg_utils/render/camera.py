@@ -4,6 +4,13 @@ import math
 import numpy as np
 import torch
 
+try:
+    torch.nn.Buffer
+    torch_has_nn_Buffer = True
+except:
+    torch_has_nn_Buffer = False
+
+
 def focal2fov(focal, pixels):
     return 2 * math.atan(pixels / (2*focal))
     
@@ -77,11 +84,20 @@ class DRTKCamera(torch.nn.Module):
         K is only for convenience, not used in rendering (at least for now)
         """
         super().__init__()
-        self.proj_mat = torch.nn.Buffer(torch.from_numpy(proj_mat))  # [H, W]
-        self.w2c_mat = torch.nn.Buffer(torch.from_numpy(w2c_mat))  # [H, W]
+        if torch_has_nn_Buffer:
+            self.proj_mat = torch.nn.Buffer(torch.from_numpy(proj_mat))  # [H, W]
+            self.w2c_mat = torch.nn.Buffer(torch.from_numpy(w2c_mat))  # [H, W]
+            self.K = torch.nn.Buffer(torch.from_numpy(K)) if K is not None else None
+        else:
+            self.register_buffer('proj_mat', torch.from_numpy(proj_mat))  # [H, W]
+            self.register_buffer('w2c_mat', torch.from_numpy(w2c_mat))  # [H, W]
+            if K is not None:
+                self.register_buffer('K', torch.from_numpy(K))
+            else:
+                self.K = None
+
         self.H = H
         self.W = W
-        self.K = torch.nn.Buffer(torch.from_numpy(K)) if K is not None else None
         self.znear = znear
         self.zfar = zfar
 
@@ -239,8 +255,12 @@ class BatchDRTKCamera(torch.nn.Module):
             proj_mats.append(cam.proj_mat.clone())
             w2c_mats.append(cam.w2c_mat.clone())
 
-        self.proj_mat = torch.nn.Buffer(torch.stack(proj_mats, dim=0))  # [B, 4, 4]
-        self.w2c_mat = torch.nn.Buffer(torch.stack(w2c_mats, dim=0))  # [B, 4, 4]
+        if torch_has_nn_Buffer:
+            self.proj_mat = torch.nn.Buffer(torch.stack(proj_mats, dim=0))  # [B, 4, 4]
+            self.w2c_mat = torch.nn.Buffer(torch.stack(w2c_mats, dim=0))  # [B, 4, 4]
+        else:
+            self.register_buffer('proj_mat', torch.stack(proj_mats, dim=0))
+            self.register_buffer('w2c_mat', torch.stack(w2c_mats, dim=0))
 
     @property
     def batch_size(self) -> int:
@@ -335,8 +355,13 @@ class NvdiffrecmcCamera(torch.nn.Module):
         full_proj_matrix: composite of projection and world2view
         """
         super().__init__()
-        self.mvp = torch.nn.Buffer(torch.from_numpy(mvp))  # [4, 4]
-        self.campos = torch.nn.Buffer(torch.from_numpy(campos))  # [3,]
+
+        if torch_has_nn_Buffer:
+            self.mvp = torch.nn.Buffer(torch.from_numpy(mvp))  # [4, 4]
+            self.campos = torch.nn.Buffer(torch.from_numpy(campos))  # [3,]
+        else:
+            self.register_buffer('mvp', torch.from_numpy(mvp))
+            self.register_buffer('campos', torch.from_numpy(campos))
         self.H = H
         self.W = W
 
