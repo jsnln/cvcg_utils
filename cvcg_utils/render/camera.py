@@ -449,12 +449,12 @@ class UnifiedCamera:
                     campos: Union[List[List[float]], np.ndarray],
                     lookat: Union[List[List[float]], np.ndarray],
                     up: Union[List[List[float]], np.ndarray],
-                    fov_x: float,
-                    fov_y: float,
-                    fov_mode: str,
-                    K: Union[List[List[float]], np.ndarray],
                     H: int,
                     W: int,
+                    fov_x: float=None,
+                    fov_y: float=None,
+                    fov_mode: str=None,
+                    K: Union[List[List[float]], np.ndarray]=None,
                     name: str=None) -> Self:
         """
         Provide either (fov_x, fov_y) or K
@@ -466,11 +466,12 @@ class UnifiedCamera:
         campos = np.array(campos)
         lookat = np.array(lookat)
         up = np.array(up)
-        K = np.array(K)
         assert (3,) == campos.shape
         assert (3,) == lookat.shape
         assert (3,) == up.shape
-        assert (3, 3) == K.shape
+        if K is not None:
+            K = np.array(K)
+            assert (3, 3) == K.shape
         
         # camera pose
         front = lookat - campos
