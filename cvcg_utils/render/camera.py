@@ -1,4 +1,4 @@
-from typing import Self, List
+from typing import Self, List, Union
 import cv2
 import math
 import numpy as np
@@ -7,7 +7,6 @@ import torch
 def focal2fov(focal, pixels):
     return 2 * math.atan(pixels / (2*focal))
     
-
 def assert_ints(*args):
     for arg in args:
         assert isinstance(arg, int)
@@ -342,7 +341,11 @@ class NvdiffrecmcCamera(torch.nn.Module):
         self.W = W
 
 class UnifiedCamera:
-    def __init__(self, K: np.ndarray, R: np.ndarray, T: np.ndarray, H: int, W: int, name: str=None):
+    def __init__(self,
+                 K: Union[List[List[float]], np.ndarray],
+                 R: Union[List[List[float]], np.ndarray],
+                 T: Union[List[List[float]], np.ndarray],
+                 H: int, W: int, name: str=None):
         """
         Note: K, R, T use the OpenCV conventions, i.e., in the camera frame
           +x <=> right
@@ -350,6 +353,10 @@ class UnifiedCamera:
           +z <=> front
         When exporting these to the opengl format, you need to change K, R, T for all
         """
+        K = np.array(K)
+        R = np.array(R)
+        T = np.array(T)
+
         self.K: np.ndarray = K.copy()  # screen space (not NDC space)
         self.R: np.ndarray = R.copy()  # w2c
         self.T: np.ndarray = T.copy()  # w2c
@@ -438,13 +445,32 @@ class UnifiedCamera:
 
 
     @classmethod
-    def from_lookat(cls, center, lookat, up, fov_x, fov_y, fov_mode, K, H, W, name=None) -> Self:
+    def from_lookat(cls,
+                    center: Union[List[List[float]], np.ndarray],
+                    lookat: Union[List[List[float]], np.ndarray],
+                    up: Union[List[List[float]], np.ndarray],
+                    fov_x: float,
+                    fov_y: float,
+                    fov_mode: str,
+                    K: Union[List[List[float]], np.ndarray],
+                    H: int,
+                    W: int,
+                    name: str=None) -> Self:
         """
         Provide either (fov_x, fov_y) or K
 
         OpenCV convention w2c matrix
         priority: front > up > right
         """
+
+        center = np.array(center)
+        lookat = np.array(lookat)
+        up = np.array(up)
+        K = np.array(K)
+        assert (3,) == center.shape
+        assert (3,) == lookat.shape
+        assert (3,) == up.shape
+        assert (3, 3) == K.shape
         
         # camera pose
         front = lookat - center
