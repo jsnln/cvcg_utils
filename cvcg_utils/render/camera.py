@@ -298,7 +298,7 @@ class GSCamera:
                  world_view_transform: torch.Tensor,
                  projection_matrix: torch.Tensor,
                  full_proj_transform: torch.Tensor,
-                 camera_center: torch.Tensor,
+                 campos: torch.Tensor,
                  H: int, W: int):
 
         self.tanfov_x = tanfov_x
@@ -306,7 +306,7 @@ class GSCamera:
         self.world_view_transform = world_view_transform
         self.projection_matrix = projection_matrix
         self.full_proj_transform = full_proj_transform
-        self.camera_center = camera_center
+        self.campos = campos
         self.H = H
         self.W = W
 
@@ -325,8 +325,8 @@ class GSCamera:
         world_view_transform = extr.T
         projection_matrix = get_projection_matrix_3dgs(znear = 0.1, zfar = 100, fov_x = fov_x, fov_y = fov_y, K = intr, img_w = W, img_h = H, array_package=torch, device=intr_3x3.device).T
         full_proj_transform = world_view_transform @ projection_matrix
-        camera_center = torch.linalg.inv(extr)[:3, 3]
-        return cls(tanfov_x, tanfov_y, world_view_transform, projection_matrix, full_proj_transform, camera_center, H, W)
+        campos = torch.linalg.inv(extr)[:3, 3]
+        return cls(tanfov_x, tanfov_y, world_view_transform, projection_matrix, full_proj_transform, campos, H, W)
 
 
 class NvdiffrecmcCamera(torch.nn.Module):
@@ -390,7 +390,7 @@ class UnifiedCamera:
         return self.c2w[:3, 2]
 
     @property
-    def center(self):
+    def campos(self):
         return self.c2w[:3, 3]
 
     def proj_points_to_camera_space(self, pts: np.ndarray):
@@ -446,7 +446,7 @@ class UnifiedCamera:
 
     @classmethod
     def from_lookat(cls,
-                    center: Union[List[List[float]], np.ndarray],
+                    campos: Union[List[List[float]], np.ndarray],
                     lookat: Union[List[List[float]], np.ndarray],
                     up: Union[List[List[float]], np.ndarray],
                     fov_x: float,
@@ -463,17 +463,17 @@ class UnifiedCamera:
         priority: front > up > right
         """
 
-        center = np.array(center)
+        campos = np.array(campos)
         lookat = np.array(lookat)
         up = np.array(up)
         K = np.array(K)
-        assert (3,) == center.shape
+        assert (3,) == campos.shape
         assert (3,) == lookat.shape
         assert (3,) == up.shape
         assert (3, 3) == K.shape
         
         # camera pose
-        front = lookat - center
+        front = lookat - campos
         front /= np.linalg.norm(front).clip(min=1e-8)
         up = up - (up @ front) * front
         down = - up / np.linalg.norm(up).clip(min=1e-8)
@@ -483,7 +483,7 @@ class UnifiedCamera:
         c2w[:3, 0] = right
         c2w[:3, 1] = down
         c2w[:3, 2] = front
-        c2w[:3, 3] = center
+        c2w[:3, 3] = campos
 
         w2c = np.linalg.inv(c2w)
         R = w2c[:3, :3]
@@ -610,7 +610,7 @@ class UnifiedCamera:
         proj_opengl[1] *= -1    # flip y
 
         mvp = proj_opengl @ w2c_opengl
-        campos = self.center
+        campos = self.campos
         
         return NvdiffrecmcCamera(mvp, campos, self.H, self.W)
 
@@ -628,11 +628,11 @@ class UnifiedCamera:
         world_view_transform = extr.T
         projection_matrix = get_projection_matrix_3dgs(znear = znear, zfar = zfar, fov_x = fov_x, fov_y = fov_y, K = self.K, img_w = self.W, img_h = self.H).T
         full_proj_transform = world_view_transform @ projection_matrix
-        camera_center = np.linalg.inv(extr)[:3, 3]
+        campos = np.linalg.inv(extr)[:3, 3]
 
         return GSCamera(tanfov_x, tanfov_y,
                         torch.from_numpy(world_view_transform),
                         torch.from_numpy(projection_matrix),
                         torch.from_numpy(full_proj_transform),
-                        torch.from_numpy(camera_center),
+                        torch.from_numpy(campos),
                         self.H, self.W)
