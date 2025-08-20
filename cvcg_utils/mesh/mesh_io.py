@@ -95,8 +95,11 @@ def read_glb(fn: str) -> List[MeshData]:
 def read_obj(fn: str) -> MeshData:
     assert fn.endswith('.obj')
 
-    verts, uv_verts, v_normals, faces, uv_faces, f_normals = \
-        igl.readOBJ(fn)
+    try:
+        verts, uv_verts, v_normals, faces, uv_faces, f_normals = igl.readOBJ(fn)
+    except:
+        verts, uv_verts, v_normals, faces, uv_faces, f_normals = igl.read_obj(fn)
+
     mesh = MeshData(verts, faces, uv_verts, uv_faces, v_normals, f_normals)
     return mesh
 
