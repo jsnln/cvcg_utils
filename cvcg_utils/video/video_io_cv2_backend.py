@@ -1,11 +1,11 @@
+import numpy as np
+import cv2
+from tqdm import trange
+
 def write_video(video_fn, image_seq, fps=30):
     """
     image_seq: either callable by index or an indexible image set
-    """
-    import numpy as np
-    import cv2
-    from tqdm import trange
-
+    """    
     if callable(image_seq):
         def get_image(i):
             return image_seq(i)
@@ -22,10 +22,6 @@ def write_video(video_fn, image_seq, fps=30):
         out.write(cv2.cvtColor(get_image(frame_id), cv2.COLOR_RGB2BGR))
 
 def read_video_rgb(video_fn, frame_range=None):
-    import numpy as np
-    import cv2
-    from tqdm import trange
-        
     cap = cv2.VideoCapture(video_fn)
 
     frame_list = []
