@@ -8,7 +8,7 @@ setup(
     author_email='linsy21@mails.tsinghua.edu.cn', 
     packages=['cvcg_utils',
               'cvcg_utils.misc',
-              'cvcg_utils.misc.train_templates',
+            #   'cvcg_utils.misc.train_templates',
               'cvcg_utils.image',
               'cvcg_utils.video',
               'cvcg_utils.mesh',
