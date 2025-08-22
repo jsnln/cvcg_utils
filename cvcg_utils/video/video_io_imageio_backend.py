@@ -2,6 +2,8 @@ import numpy as np
 import imageio
 from tqdm import trange
 
+def read_video(video_fn):
+    return imageio.mimread(video_fn)
 
 def write_video(video_fn, image_seq, fps=30):
     """
