@@ -307,22 +307,25 @@ def get_value_and_uv_laplacian_masked(H: int, W: int, vmask: np.ndarray, dmask: 
     # NOTE this is how you would normally construct L, but we will directly compute concatenated indices below
 
     # get diag part
-    idx_diag = np.arange(H*W, dtype=int)[dmask_flat]
-    L_diag_vals = -1 * np.ones(H*W, dtype=int)[dmask_flat]
+    du_idx_diag = np.arange(H*W, dtype=int)[dmask_flat]
+    du_L_diag_vals = -1 * np.ones(H*W, dtype=int)[dmask_flat] * (du_deg_full[dmask_flat] > 0).astype(float) # NOTE only compute laplacian for verts that have neighbors
+
+    dv_idx_diag = np.arange(H*W, dtype=int)[dmask_flat]
+    dv_L_diag_vals = -1 * np.ones(H*W, dtype=int)[dmask_flat] * (dv_deg_full[dmask_flat] > 0).astype(float) # NOTE only compute laplacian for verts that have neighbors
     # L_diag = csc_array((L_diag_vals, (idx_diag, idx_diag)), shape=(H*W, H*W))
     # NOTE this is how you would normally construct L, but we will directly compute concatenated indices below
 
     # get L
-    du_L_vals = np.concatenate([du_L_nondiag_vals, L_diag_vals])
-    du_L_rowinds = np.concatenate([du_idx_edges[:, 0], idx_diag])
-    du_L_colinds = np.concatenate([du_idx_edges[:, 1], idx_diag])
+    du_L_vals = np.concatenate([du_L_nondiag_vals, du_L_diag_vals])
+    du_L_rowinds = np.concatenate([du_idx_edges[:, 0], du_idx_diag])
+    du_L_colinds = np.concatenate([du_idx_edges[:, 1], du_idx_diag])
     du_L_rowinds = ind_map_full2validd_flat[du_L_rowinds]
     du_L_colinds = ind_map_full2validd_flat[du_L_colinds]
     du_L = csc_array((du_L_vals, (du_L_rowinds, du_L_colinds)), shape=(N_validd, N_validd))
 
-    dv_L_vals = np.concatenate([dv_L_nondiag_vals, L_diag_vals])
-    dv_L_rowinds = np.concatenate([dv_idx_edges[:, 0], idx_diag])
-    dv_L_colinds = np.concatenate([dv_idx_edges[:, 1], idx_diag])
+    dv_L_vals = np.concatenate([dv_L_nondiag_vals, dv_L_diag_vals])
+    dv_L_rowinds = np.concatenate([dv_idx_edges[:, 0], dv_idx_diag])
+    dv_L_colinds = np.concatenate([dv_idx_edges[:, 1], dv_idx_diag])
     dv_L_rowinds = ind_map_full2validd_flat[dv_L_rowinds]
     dv_L_colinds = ind_map_full2validd_flat[dv_L_colinds]
     dv_L = csc_array((dv_L_vals, (dv_L_rowinds, dv_L_colinds)), shape=(N_validd, N_validd))
