@@ -308,10 +308,10 @@ def get_value_and_uv_laplacian_masked(H: int, W: int, vmask: np.ndarray, dmask: 
 
     # get diag part
     du_idx_diag = np.arange(H*W, dtype=int)[dmask_flat]
-    du_L_diag_vals = -1 * np.ones(H*W, dtype=int)[dmask_flat] * (du_deg_full[dmask_flat] > 0).astype(float) # NOTE only compute laplacian for verts that have neighbors
+    du_L_diag_vals = -1 * np.ones(H*W, dtype=int)[dmask_flat] * (du_deg_full[dmask_flat] > 1).astype(float) # NOTE only compute laplacian for verts that have neighbors
 
     dv_idx_diag = np.arange(H*W, dtype=int)[dmask_flat]
-    dv_L_diag_vals = -1 * np.ones(H*W, dtype=int)[dmask_flat] * (dv_deg_full[dmask_flat] > 0).astype(float) # NOTE only compute laplacian for verts that have neighbors
+    dv_L_diag_vals = -1 * np.ones(H*W, dtype=int)[dmask_flat] * (dv_deg_full[dmask_flat] > 1).astype(float) # NOTE only compute laplacian for verts that have neighbors
     # L_diag = csc_array((L_diag_vals, (idx_diag, idx_diag)), shape=(H*W, H*W))
     # NOTE this is how you would normally construct L, but we will directly compute concatenated indices below
 
