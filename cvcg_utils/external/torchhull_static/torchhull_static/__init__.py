@@ -54,14 +54,14 @@ from torchhull._C import (
     visual_hull_with_candidate_voxels,
 )
 
-__author__ = ", ".join(
-    [
-        email.utils.parseaddr(author.strip())[0]
-        for author in importlib.metadata.metadata(__package__)["Author-email"].split(",")
-    ]
-)
-__version__ = importlib.metadata.version(__package__)
-__copyright__ = f"2024, {__author__}"
+# __author__ = ", ".join(
+#     [
+#         email.utils.parseaddr(author.strip())[0]
+#         for author in importlib.metadata.metadata(__package__)["Author-email"].split(",")
+#     ]
+# )
+# __version__ = importlib.metadata.version(__package__)
+# __copyright__ = f"2024, {__author__}"
 
 __all__ = [
     "candidate_voxels_to_wireframes",
