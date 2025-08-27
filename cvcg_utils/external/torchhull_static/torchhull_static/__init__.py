@@ -44,7 +44,7 @@ VSCODE_STUBS_DIRECTORY = PROJECT_ROOT_DIRECTORY / "typings"
 #     verbose=False,
 # )
 
-from torchhull._C import (
+from torchhull_static._C import (
     candidate_voxels_to_wireframes,
     gaussian_blur,
     marching_cubes,
