@@ -19,7 +19,7 @@ pygments_style = 'sphinx'
 extensions = [
     'sphinx_rtd_theme',
     'sphinx.ext.todo',
-    # 'sphinxcontrib.imagesvg',
+    'sphinxcontrib.imagesvg',
 ]
 
 templates_path = ['_templates']
