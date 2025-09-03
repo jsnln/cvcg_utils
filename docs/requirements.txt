@@ -7,5 +7,5 @@ scipy
 pytorch3d
 plyfile
 pygltflib
-git+https://github.com/facebookresearch/DRTK.git --global-option="--no-build-isolation"
+git+https://github.com/facebookresearch/DRTK.git
 git+https://github.com/jsnln/cvcg_utils.git@v1.2.rc1
