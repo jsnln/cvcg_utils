@@ -5,5 +5,4 @@ opencv-python
 scipy
 plyfile
 pygltflib
-torch
-git+https://github.com/jsnln/cvcg_utils.git@v1.2.rc1
+git+https://github.com/jsnln/cvcg_utils.git
