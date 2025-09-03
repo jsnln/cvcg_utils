@@ -3,7 +3,6 @@ numpy
 libigl
 opencv-python
 scipy
-pytorch3d
 plyfile
 pygltflib
 torch
