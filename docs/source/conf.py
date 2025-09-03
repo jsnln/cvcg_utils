@@ -38,6 +38,9 @@ html_static_path = ['_static']
 
 todo_include_todos = True
 
+
+autodoc_mock_imports = ['matplotlib', 'pytorch3d', 'tqdm', 'drtk', 'diff_gaussian_rasterization',  'e3nn']
+
 # import sys
 # import os
 
