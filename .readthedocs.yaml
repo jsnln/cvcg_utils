@@ -25,5 +25,4 @@ python:
    install:
    - method: pip
      requirements: docs/requirements.txt
-     args: ["--no-build-isolation"]
         
