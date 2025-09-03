@@ -1,5 +1,5 @@
-cvcg_utils
-==========
+API Documentation
+=================
 
 .. toctree::
    :maxdepth: 2
