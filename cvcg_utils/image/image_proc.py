@@ -3,24 +3,24 @@ import numpy as np
 import cv2
 from scipy.sparse import csc_array
 
-def get_laplacian(H: int, W: int):
+def get_laplacian(H: int, W: int) -> csc_array:
     """
-    **Modified from pytorch3d.ops.laplacian**
+    Computes the sparse Laplacian for an image of shape [H, W].
+
+    Pixels in the image are indexed from 0 to H*W-1 in a row-major order.
+
+    The output is a ``scipy.sparse.csc_array`` sparse matrix L such that
+
+    * L[i,i] = -1
+    * L[i,j] = 1 / deg(i), if j in the 4-neighborhood of i
+        
+    where i, j here are flattened pixel indices.
     
-    Computes the laplacian matrix.
-    The definition of the laplacian is
-    L[i, j] =    -1       , if i == j
-    L[i, j] = 1 / deg(i)  , if (i, j) is an edge
-    L[i, j] =    0        , otherwise
-    where deg(i) is the degree of the i-th vertex in the graph.
-
-    Args:
-        n_verts
-        faces: tensor of shape (Nf, 2)
-    Returns:
-        L: Sparse FloatTensor of shape (V, V)
+    Returns
+    -------
+    L: ``scipy.sparse.csc_array``
+        of shape (H*W, H*W)
     """
-
     pix_ind_img = np.arange(H*W, dtype=int).reshape(H, W)
     hori_edges = np.stack([pix_ind_img[:, :-1], pix_ind_img[:, 1:]], axis=-1)   # [H, W-1, 2]
     vert_edges = np.stack([pix_ind_img[:-1, :], pix_ind_img[1:, :]], axis=-1)   # [H-1, W, 2]
@@ -55,22 +55,32 @@ def get_laplacian(H: int, W: int):
 
 def get_value_and_laplacian(H: int, W: int, mask: np.ndarray, value_scale: float=1.0, return_separate: bool=False):
     """
-    **Modified from pytorch3d.ops.laplacian**
+    Computes a selection matrix V for a masked region given by ``mask`` together with the Laplacian L as in get_laplacian.
+
+    Returns the vertical concatenation VL of V and L
+
+    Parameters
+    ----------
+    H: int
+        image height
+    W: int
+        image width
+    mask: np.ndarray[bool]
+        whose shape must be equal to (H, W)
+    value_scale: float
+        a constant scale applied to the selection matrix V
+    return_separate: bool
+        If True, returns (VL, V, L). If False, V and L are set to None
     
-    Computes the laplacian matrix.
-    The definition of the laplacian is
-    L[i, j] =    -1       , if i == j
-    L[i, j] = 1 / deg(i)  , if (i, j) is an edge
-    L[i, j] =    0        , otherwise
-    where deg(i) is the degree of the i-th vertex in the graph.
-
-    Args:
-        n_verts
-        faces: tensor of shape (Nf, 2)
-    Returns:
-        L: Sparse FloatTensor of shape (V, V)
+    Returns
+    -------
+    VL: ``scipy.sparse.csc_array``
+        of shape (N + H*W, H*W), where N is the number of valid pixels in ``mask``
+    V: ``scipy.sparse.csc_array``
+        of shape (N, H*W)
+    L: ``scipy.sparse.csc_array``
+        of shape (H*W, H*W)
     """
-
     assert (H, W) == mask.shape
 
     pix_ind_img = np.arange(H*W, dtype=int).reshape(H, W)
@@ -138,20 +148,7 @@ def get_value_and_laplacian(H: int, W: int, mask: np.ndarray, value_scale: float
 
 def get_value_and_laplacian_masked(H: int, W: int, vmask: np.ndarray, dmask: np.ndarray, value_scale: float=1.0):
     """
-    **Modified from pytorch3d.ops.laplacian**
-    
-    Computes the laplacian matrix.
-    The definition of the laplacian is
-    L[i, j] =    -1       , if i == j
-    L[i, j] = 1 / deg(i)  , if (i, j) is an edge
-    L[i, j] =    0        , otherwise
-    where deg(i) is the degree of the i-th vertex in the graph.
-
-    Args:
-        n_verts
-        faces: tensor of shape (Nf, 2)
-    Returns:
-        L: Sparse FloatTensor of shape (V, V)
+    Sames as ``get_value_and_laplacian``, but now Laplacian is only computed for ``dmask``
     """
 
     assert (H, W) == vmask.shape    # value part mask
@@ -228,20 +225,7 @@ def get_value_and_laplacian_masked(H: int, W: int, vmask: np.ndarray, dmask: np.
 
 def get_value_and_uv_laplacian_masked(H: int, W: int, vmask: np.ndarray, dmask: np.ndarray, value_scale: float=1.0):
     """
-    **Modified from pytorch3d.ops.laplacian**
-    
-    Computes the laplacian matrix.
-    The definition of the laplacian is
-    L[i, j] =    -1       , if i == j
-    L[i, j] = 1 / deg(i)  , if (i, j) is an edge
-    L[i, j] =    0        , otherwise
-    where deg(i) is the degree of the i-th vertex in the graph.
-
-    Args:
-        n_verts
-        faces: tensor of shape (Nf, 2)
-    Returns:
-        L: Sparse FloatTensor of shape (V, V)
+    Sames as ``get_value_and_laplacian_masked``, but only 1D Laplacians are computed
     """
 
     assert (H, W) == vmask.shape    # value part mask

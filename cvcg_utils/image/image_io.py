@@ -2,106 +2,176 @@ import os
 import numpy as np
 import cv2
 
-def read_rgb(fn):
+def read_rgb(fn: str) -> np.ndarray:
+    """
+    Reads and returns a 3-channel RGB image (``cv2`` backend).
+
+    Raises ``AssertionError`` if image read fails or if the image is not 3-channel.
+    """
     img = cv2.imread(fn, cv2.IMREAD_UNCHANGED)
-    assert len(img.shape) == 3
-    assert img.shape[-1] == 3
+    assert img is not None, f"image read failed for {fn}"
+    assert len(img.shape) == 3, f"image {fn} must not be grayscale"
+    assert img.shape[-1] == 3, f"image {fn} must have 3 channels"
     return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-def read_rgba(fn):
+def read_rgba(fn: str) -> np.ndarray:
+    """
+    Reads and returns a 4-channel RGBA image (``cv2`` backend).
+    
+    Raises ``AssertionError`` if image read fails or if the image is not 4-channel.
+    """
     img = cv2.imread(fn, cv2.IMREAD_UNCHANGED)
-    assert len(img.shape) == 3
-    assert img.shape[-1] == 4
+    assert img is not None, f"image read failed for {fn}"
+    assert len(img.shape) == 3, f"image {fn} must not be grayscale"
+    assert img.shape[-1] == 4, f"image {fn} must have 4 channels"
     return cv2.cvtColor(img, cv2.COLOR_BGRA2RGBA)
 
-def read_grayscale(fn: str):
+def read_grayscale(fn: str) -> np.ndarray:
+    """
+    Reads and returns a grayscale image (``cv2`` backend).
+    
+    Raises ``AssertionError`` if image read fails or if the image is not 1-channel.
+    """
     grayscale = cv2.imread(fn, cv2.IMREAD_UNCHANGED)
-    assert len(grayscale.shape) == 2
+    assert grayscale is not None, f"image read failed for {fn}"
+    assert len(grayscale.shape) == 2, f"image {fn} must be grayscale"
     return grayscale
 
-def read_rgb_exr(fn):
-    assert os.path.splitext(fn)[-1] in ['.exr']
+def read_rgb_exr(fn) -> np.ndarray:
+    """
+    Reads and returns an exr format RGB image (``cv2`` backend).
+    
+    Raises ``AssertionError`` if the image is not in exr format, if image read fails or if the image is not 3-channel.
+    """
+    assert os.path.splitext(fn)[-1] in ['.exr'], f"{fn} does not have .exr format"
     img = cv2.imread(fn, cv2.IMREAD_UNCHANGED)
-    assert len(img.shape) == 3
-    assert img.shape[-1] == 3
+    assert img is not None, f"image read failed for {fn}"
+    assert len(img.shape) == 3, f"image {fn} must not be grayscale"
+    assert img.shape[-1] == 3, f"image {fn} must have 3 channels"
     return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
 def write_rgb(fn: str, rgb: np.ndarray):
-    assert rgb.dtype == np.uint8
-    assert len(rgb.shape) == 3
-    assert rgb.shape[2] == 3
-    assert os.path.splitext(fn)[-1].lower() in ['.png', '.jpg', '.jpeg']
+    """
+    Write ``np.uint8`` RGB image ``rgb`` to path ``fn`` (``cv2`` backend). Supports only ``.png``, ``.jpg`` and ``.jpeg`` formats.
+    
+    Raises ``AssertionError`` if the image is not ``np.uint8`` RGB, if ``fn`` has a wrong suffix, or if image write fails.
+    """
+    assert rgb.dtype == np.uint8, f"the image must have dtype np.uint8"
+    assert len(rgb.shape) == 3, f"the image must be 3-channel RGB"
+    assert rgb.shape[2] == 3, f"the image must be 3-channel RGB"
+    assert os.path.splitext(fn)[-1].lower() in ['.png', '.jpg', '.jpeg'], f"the output format must be png, jpg or jpeg"
 
     bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
-    cv2.imwrite(fn, bgr)
+    assert cv2.imwrite(fn, bgr), f"writing to {fn} failed"
 
 
 def write_rgba(fn: str, rgba: np.ndarray):
-    assert rgba.dtype == np.uint8
-    assert len(rgba.shape) == 3
-    assert rgba.shape[2] == 4
-    assert os.path.splitext(fn)[-1].lower() in ['.png', '.jpg', '.jpeg']
+    """
+    Write ``np.uint8`` RGBA image ``rgb`` to path ``fn`` (``cv2`` backend). Supports only ``.png``, ``.jpg`` and ``.jpeg`` formats.
+    
+    Raises ``AssertionError`` if the image is not ``np.uint8`` RGBA, if ``fn`` has a wrong suffix, or if image write fails.
+    """
+    assert rgba.dtype == np.uint8, f"the image must have dtype np.uint8"
+    assert len(rgba.shape) == 3, f"the image must be 4-channel RGBA"
+    assert rgba.shape[2] == 4, f"the image must be 4-channel RGBA"
+    assert os.path.splitext(fn)[-1].lower() in ['.png', '.jpg', '.jpeg'], f"the output format must be png, jpg or jpeg"
 
     bgra = cv2.cvtColor(rgba, cv2.COLOR_RGBA2BGRA)
-    cv2.imwrite(fn, bgra)
+    assert cv2.imwrite(fn, bgra), f"writing to {fn} failed"
 
 def write_rgb_uint16(fn: str, rgb: np.ndarray):
-    assert rgb.dtype == np.uint16
-    assert len(rgb.shape) == 3
-    assert rgb.shape[2] == 3
-    assert os.path.splitext(fn)[-1].lower() in ['.png', '.jpg', '.jpeg']
+    """
+    Write ``np.uint16`` RGB image ``rgb`` to path ``fn`` (``cv2`` backend). Supports only ``.png``, ``.jpg`` and ``.jpeg`` formats.
+    
+    Raises ``AssertionError`` if the image is not ``np.uint16`` RGB, if ``fn`` has a wrong suffix, or if image write fails.
+    """
+    assert rgb.dtype == np.uint16, f"the image must have dtype np.uint16"
+    assert len(rgb.shape) == 3, f"the image must be 3-channel RGB"
+    assert rgb.shape[2] == 3, f"the image must be 3-channel RGB"
+    assert os.path.splitext(fn)[-1].lower() in ['.png', '.jpg', '.jpeg'], f"the output format must be png, jpg or jpeg"
 
     bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
-    cv2.imwrite(fn, bgr)
-
+    assert cv2.imwrite(fn, bgr), f"writing to {fn} failed"
 
 def write_grayscale_uint16(fn: str, grayscale: np.ndarray):
-    assert grayscale.dtype == np.uint16
-    assert len(grayscale.shape) == 2
-    assert os.path.splitext(fn)[-1].lower() in ['.png']
+    """
+    Write ``np.uint16`` grayscale image ``rgb`` to path ``fn`` (``cv2`` backend). Supports only ``.png`` format.
+    
+    Raises ``AssertionError`` if the image is not ``np.uint16`` grayscale, if ``fn`` has a wrong suffix, or if image write fails.
+    """
+    assert grayscale.dtype == np.uint16, f"the image must have dtype np.uint16"
+    assert len(grayscale.shape) == 2, f"the image must be grayscale"
+    assert os.path.splitext(fn)[-1].lower() in ['.png'], f"the output format must be png"
 
-    cv2.imwrite(fn, grayscale)
+    assert cv2.imwrite(fn, grayscale), f"writing to {fn} failed"
 
 
 def write_rgba_uint16(fn: str, rgba: np.ndarray):
-    assert rgba.dtype == np.uint16
-    assert len(rgba.shape) == 3
-    assert rgba.shape[2] == 4
-    assert os.path.splitext(fn)[-1].lower() in ['.png', '.jpg', '.jpeg']
+    """
+    Write ``np.uint16`` RGBA image ``rgba`` to path ``fn`` (``cv2`` backend). Supports only ``.png``, ``.jpg`` and ``.jpeg`` formats.
+    
+    Raises ``AssertionError`` if the image is not ``np.uint16`` RGBA, if ``fn`` has a wrong suffix, or if image write fails.
+    """
+    assert rgba.dtype == np.uint16, f"the image must have dtype np.uint16"
+    assert len(rgba.shape) == 3, f"the image must be 4-channel RGBA"
+    assert rgba.shape[2] == 4, f"the image must be 4-channel RGBA"
+    assert os.path.splitext(fn)[-1].lower() in ['.png', '.jpg', '.jpeg'], f"the output format must be png, jpg or jpeg"
 
     bgra = cv2.cvtColor(rgba, cv2.COLOR_RGBA2BGRA)
-    cv2.imwrite(fn, bgra)
-
-def write_rgb_exr(fn: str, rgb: np.ndarray):
-    assert rgb.dtype == np.float32
-    assert len(rgb.shape) == 3
-    assert rgb.shape[2] == 3
-    assert os.path.splitext(fn)[-1] in ['.exr']
-
-    bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
-    cv2.imwrite(fn, bgr)
+    assert cv2.imwrite(fn, bgra), f"writing to {fn} failed"
 
 def write_bgr(fn: str, bgr: np.ndarray):
-    assert bgr.dtype == np.uint8
-    assert len(bgr.shape) == 3
-    assert bgr.shape[2] == 3
-    assert os.path.splitext(fn)[-1].lower() in ['.png', '.jpg', '.jpeg']
+    """
+    Write ``np.uint8`` BGR image ``bgr`` to path ``fn`` (``cv2`` backend). Supports only ``.png``, ``.jpg`` and ``.jpeg`` formats.
+    
+    Raises ``AssertionError`` if the image is not ``np.uint8`` RGB, if ``fn`` has a wrong suffix, or if image write fails.
+    """
+    assert bgr.dtype == np.uint8, f"the image must have dtype np.uint8"
+    assert len(bgr.shape) == 3, f"the image must be 3-channel RGB"
+    assert bgr.shape[2] == 3, f"the image must be 3-channel RGB"
+    assert os.path.splitext(fn)[-1].lower() in ['.png', '.jpg', '.jpeg'], f"the output format must be png, jpg or jpeg"
 
-    cv2.imwrite(fn, bgr)
+    assert cv2.imwrite(fn, bgr), f"writing to {fn} failed"
+
+
+def write_rgb_exr(fn: str, rgb: np.ndarray):
+    """
+    Write ``np.float32`` RGB image ``rgb`` to path ``fn`` (``cv2`` backend). Supports only ``.exr`` format.
+    
+    Raises ``AssertionError`` if the image is not ``np.float32`` RGB, if ``fn`` has a wrong suffix, or if image write fails.
+    """
+    assert rgb.dtype == np.float32, f"the image must have dtype np.float32"
+    assert len(rgb.shape) == 3, f"the image must be 3-channel RGB"
+    assert rgb.shape[2] == 3, f"the image must be 3-channel RGB"
+    assert os.path.splitext(fn)[-1] in ['.exr'], f"the output format must be exr"
+
+    bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+    assert cv2.imwrite(fn, bgr), f"writing to {fn} failed"
+
 
 def write_grayscale_exr(fn: str, grayscale: np.ndarray):
-    assert grayscale.dtype == np.float32
-    assert len(grayscale.shape) == 2
-    assert os.path.splitext(fn)[-1].lower() in ['.exr']
+    """
+    Write ``np.float32`` grayscale image ``grayscale`` to path ``fn`` (``cv2`` backend). Supports only ``.exr`` format.
+    
+    Raises ``AssertionError`` if the image is not ``np.float32`` grayscale, if ``fn`` has a wrong suffix, or if image write fails.
+    """
+    assert grayscale.dtype == np.float32, f"the image must have dtype np.float32"
+    assert len(grayscale.shape) == 2, f"the image must be 2-channel grayscale"
+    assert os.path.splitext(fn)[-1].lower() in ['.exr'], f"the output format must be exr"
 
-    cv2.imwrite(fn, grayscale)
+    assert cv2.imwrite(fn, grayscale), f"writing to {fn} failed"
 
 def write_grayscale(fn: str, grayscale: np.ndarray):
-    assert grayscale.dtype == np.uint8
-    assert len(grayscale.shape) == 2
-    assert os.path.splitext(fn)[-1].lower() in ['.png', '.jpg', '.jpeg']
+    """
+    Write ``np.uint8`` grayscale image ``grayscale`` to path ``fn`` (``cv2`` backend). Supports only ``.png``, ``.jpg`` and ``.jpeg`` format.
+    
+    Raises ``AssertionError`` if the image is not ``np.float32`` grayscale, if ``fn`` has a wrong suffix, or if image write fails.
+    """
+    assert grayscale.dtype == np.uint8, f"the image must have dtype np.uint8"
+    assert len(grayscale.shape) == 2, f"the image must be 2-channel grayscale"
+    assert os.path.splitext(fn)[-1].lower() in ['.png', '.jpg', '.jpeg'], f"the output format must be png, jpg or jpeg"
 
-    cv2.imwrite(fn, grayscale)
+    assert cv2.imwrite(fn, grayscale), f"writing to {fn} failed"
 
 def to_u8_s255(src: np.ndarray):
     """
