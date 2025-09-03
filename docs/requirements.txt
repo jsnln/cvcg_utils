@@ -1,2 +1,5 @@
 sphinx-rtd-theme
+numpy
+libigl
+torch
 git+https://github.com/jsnln/cvcg_utils.git@v1.2.rc1
