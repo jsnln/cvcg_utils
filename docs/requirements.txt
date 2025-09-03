@@ -1,1 +1,2 @@
 sphinx-rtd-theme
+git+https://github.com/jsnln/cvcg_utils.git@v1.2.rc1
