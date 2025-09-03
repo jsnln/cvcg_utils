@@ -37,3 +37,8 @@ html_theme = "sphinx_rtd_theme"
 html_static_path = ['_static']
 
 todo_include_todos = True
+
+import sys
+import os
+
+sys.path.insert(0, os.path.abspath('../../'))
