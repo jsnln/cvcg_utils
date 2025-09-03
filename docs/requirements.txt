@@ -1,11 +1,9 @@
 sphinx-rtd-theme
 numpy
 libigl
-torch
 opencv-python
 scipy
 pytorch3d
 plyfile
 pygltflib
-git+https://github.com/facebookresearch/DRTK.git
 git+https://github.com/jsnln/cvcg_utils.git@v1.2.rc1
