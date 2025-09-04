@@ -215,7 +215,7 @@ def read_depth_logcompressed_dr_png(path: Union[str, os.PathLike, IO], read_nan_
     return depth, unit
 
 
-def write_logcompressed_dr_png(
+def write_depth_logcompressed_dr_png(
     path: Union[str, os.PathLike, IO], 
     depth: np.ndarray, 
     unit: float = None,
