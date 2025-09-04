@@ -7,7 +7,31 @@ from scipy.spatial import Delaunay
 
 def make_pixel_uvs(H, W, homogeneous):
     """
-    generates pixel uv coord image
+    generates a pixel uv coord image ``uv_img`` of shape [H, W, 2],
+    where ``uv_img[i, j] = [i+0.5, j+0.5]`` is the center coordinates of pixel (i, j):
+
+    .. code-block::
+
+        [[0.5,   0.5], [1.5,   0.5], [2.5,   0.5], ..., [W-1.5,   0.5],
+         [0.5,   1.5], [1.5,   1.5], [2.5,   1.5], ..., [W-1.5,   1.5],
+         ...
+         [0.5, H-1.5], [1.5, H-1.5], [2.5, H-1.5], ..., [W-1.5, H-1.5]]
+
+    If ``homogeneous`` is True, the uv_img is padded with a constant value 1.
+
+    Parameters
+    ----------
+    H : int
+        height of the image
+    W : int
+        width of the image
+    homogeneous : bool
+        whether to make uv_img homogeneous
+
+    Returns
+    -------
+    uv_img : np.ndarray
+        uv coord image of shape [H, W, 2] or [H, W, 3] if ``homogeneous`` is True
     """
     u_axis = np.linspace(0, W-1, W) + 0.5
     v_axis = np.linspace(0, H-1, H) + 0.5
