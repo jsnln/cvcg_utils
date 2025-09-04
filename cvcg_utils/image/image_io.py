@@ -215,7 +215,7 @@ def read_depth_logcompressed_dr_png(path: Union[str, os.PathLike, IO], read_nan_
     return depth, unit
 
 
-def write_depth(
+def write_logcompressed_dr_png(
     path: Union[str, os.PathLike, IO], 
     depth: np.ndarray, 
     unit: float = None,
@@ -247,7 +247,7 @@ def write_depth(
     - `far`: the maximum depth value
     - `unit`: the unit of the depth values (optional)
     """
-    mask_values, mask_nan, mask_inf = np.isfinite(depth), np.isnan(depth),np.isinf(depth)
+    mask_values, mask_nan, mask_inf = np.isfinite(depth) & (depth > 0), np.isnan(depth) | (depth <= 0), np.isinf(depth)
 
     depth = depth.astype(np.float32)
     mask_finite = depth
