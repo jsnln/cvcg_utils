@@ -186,7 +186,7 @@ def to_u8_s255(src: np.ndarray):
 
 
 
-def read_depth_logcompressed_dr_png(path: Union[str, os.PathLike, IO]) -> Tuple[np.ndarray, float]:
+def read_depth_logcompressed_dr_png(path: Union[str, os.PathLike, IO], read_nan_inf_as_zero: bool=False) -> Tuple[np.ndarray, float]:
     """
     Take from https://github.com/microsoft/MoGe/blob/main/moge/utils/io.py#L89
 
@@ -206,8 +206,12 @@ def read_depth_logcompressed_dr_png(path: Union[str, os.PathLike, IO]) -> Tuple[
     mask_nan, mask_inf = depth == 0, depth == 65535
     depth = (depth.astype(np.float32) - 1) / 65533
     depth = near ** (1 - depth) * far ** depth
-    depth[mask_nan] = np.nan
-    depth[mask_inf] = np.inf
+    if read_nan_inf_as_zero:
+        depth[mask_nan] = 0
+        depth[mask_inf] = 0
+    else:
+        depth[mask_nan] = np.nan
+        depth[mask_inf] = np.inf
     return depth, unit
 
 
