@@ -1,6 +1,11 @@
+from typing import Union, Tuple, IO
+from pathlib import Path
 import os
+import io
 import numpy as np
 import cv2
+import PIL.Image
+import PIL.PngImagePlugin
 
 def read_rgb(fn: str) -> np.ndarray:
     """
@@ -178,3 +183,80 @@ def to_u8_s255(src: np.ndarray):
     change type to uint8 and scale by 255
     """
     return (src * 255).astype(np.uint8)
+
+
+
+def read_depth_logcompressed_dr_png(path: Union[str, os.PathLike, IO]) -> Tuple[np.ndarray, float]:
+    """
+    Take from https://github.com/microsoft/MoGe/blob/main/moge/utils/io.py#L89
+
+    Read a depth image, return float32 depth array of shape (H, W).
+
+    This depth should be in uint16 png format, values are dynamically log-scaled to 1 ~ 65534
+    """
+    if isinstance(path, (str, os.PathLike)):
+        data = Path(path).read_bytes()
+    else:
+        data = path.read()
+    pil_image = PIL.Image.open(io.BytesIO(data))
+    near = float(pil_image.info.get('near'))
+    far = float(pil_image.info.get('far'))
+    unit = float(pil_image.info.get('unit')) if 'unit' in pil_image.info else None
+    depth = np.array(pil_image)
+    mask_nan, mask_inf = depth == 0, depth == 65535
+    depth = (depth.astype(np.float32) - 1) / 65533
+    depth = near ** (1 - depth) * far ** depth
+    depth[mask_nan] = np.nan
+    depth[mask_inf] = np.inf
+    return depth, unit
+
+
+def write_depth(
+    path: Union[str, os.PathLike, IO], 
+    depth: np.ndarray, 
+    unit: float = None,
+    max_range: float = 1e5,
+    compression_level: int = 7,
+):
+    """
+    This is taken from https://github.com/microsoft/MoGe/blob/main/moge/utils/io.py#L110
+
+    This depth will be dynamically log-scaled to 1 ~ 65534 and converted to uint16 png format.
+
+    Encode and write a depth image as 16-bit PNG format.
+    ### Parameters:
+    - `path: Union[str, os.PathLike, IO]`
+        The file path or file object to write to.
+    - `depth: np.ndarray`
+        The depth array, float32 array of shape (H, W). 
+        May contain `NaN` for invalid values and `Inf` for infinite values.
+    - `unit: float = None`
+        The unit of the depth values.
+    
+    Depth values are encoded as follows:
+    - 0: unknown
+    - 1 ~ 65534: depth values in logarithmic
+    - 65535: infinity
+    
+    metadata is stored in the PNG file as text fields:
+    - `near`: the minimum depth value
+    - `far`: the maximum depth value
+    - `unit`: the unit of the depth values (optional)
+    """
+    mask_values, mask_nan, mask_inf = np.isfinite(depth), np.isnan(depth),np.isinf(depth)
+
+    depth = depth.astype(np.float32)
+    mask_finite = depth
+    near = max(depth[mask_values].min(), 1e-5)
+    far = max(near * 1.1, min(depth[mask_values].max(), near * max_range))
+    depth = 1 + np.round((np.log(np.nan_to_num(depth, nan=0).clip(near, far) / near) / np.log(far / near)).clip(0, 1) * 65533).astype(np.uint16) # 1~65534
+    depth[mask_nan] = 0
+    depth[mask_inf] = 65535
+
+    pil_image = PIL.Image.fromarray(depth)
+    pnginfo = PIL.PngImagePlugin.PngInfo()
+    pnginfo.add_text('near', str(near))
+    pnginfo.add_text('far', str(far))
+    if unit is not None:
+        pnginfo.add_text('unit', str(unit))
+    pil_image.save(path, pnginfo=pnginfo, compress_level=compression_level)
