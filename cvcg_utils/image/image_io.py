@@ -186,7 +186,7 @@ def to_u8_s255(src: np.ndarray):
 
 
 
-def read_depth_logcompressed_dr_png(path: Union[str, os.PathLike, IO], read_nan_inf_as_zero: bool=False) -> Tuple[np.ndarray, float]:
+def read_depth_compressed_dr_png(path: Union[str, os.PathLike, IO], read_nan_inf_as_zero: bool=False) -> Tuple[np.ndarray, float]:
     """
     Take from https://github.com/microsoft/MoGe/blob/main/moge/utils/io.py#L89
 
@@ -215,7 +215,7 @@ def read_depth_logcompressed_dr_png(path: Union[str, os.PathLike, IO], read_nan_
     return depth, unit
 
 
-def write_depth_logcompressed_dr_png(
+def write_depth_compressed_dr_png(
     path: Union[str, os.PathLike, IO], 
     depth: np.ndarray, 
     unit: float = None,
