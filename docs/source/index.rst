@@ -42,6 +42,7 @@
    getting_started
    math_test
    tutorials/network_architectures
+   tutorials/uv_best_practice
    api_source/modules
 
 
