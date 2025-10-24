@@ -222,15 +222,15 @@ class Img2Grad(nn.Module):
         with torch.no_grad():
             if mask is None:
                 mask = torch.ones(B, H, W, dtype=torch.bool, device=img.device)
-            valid_map = F.conv2d(mask[:, None].float(), self.valid_kernel, padding=1) # [B, 4, H, W]
-            valid_map[valid_map != 2] = 0.
-            valid_map[valid_map == 2] = 1.
+            valid_map = F.conv2d(mask[:, None].float(), self.valid_kernel, padding=1).sum(1) # [B, H, W]    # summing over difference directions is safer: we only consider interior points
+            valid_map[valid_map != 8] = 0.
+            valid_map[valid_map == 8] = 1.
         
-        grad_map = (diff_map * valid_map[:, None])    # [B, C, 4, H, W] * [B, 1, 4, H, W] -> [B, C, 4, H, W]
+        grad_map = (diff_map * valid_map[:, None, None])    # [B, C, 4, H, W] * [B, 1, 1, H, W] -> [B, C, 4, H, W]
         
         return grad_map, valid_map
 
-
+torch.nn.Linear
 if __name__ == '__main__':
     posmap = cv2.imread('cano_smpl_pos_map.exr', cv2.IMREAD_UNCHANGED)
     posmap = torch.from_numpy(posmap).permute(2, 0, 1)
