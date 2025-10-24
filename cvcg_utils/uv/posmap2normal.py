@@ -129,7 +129,7 @@ class Posmap2Normal(nn.Module):
         assert len(posmap.shape) == 4
         assert posmap.shape[1] == 3
         
-        if mask is not None: assert len(mask) == 3
+        if mask is not None: assert len(mask.shape) == 3
         # assert flip_mask is None
 
         b, _, h, w = posmap.shape
@@ -207,7 +207,7 @@ class Img2Grad(nn.Module):
         """
         assert len(img.shape) == 4
         assert img.shape[1] == 3
-        if mask is not None: assert len(mask) == 3
+        if mask is not None: assert len(mask.shape) == 3
 
         B, C, H, W = img.shape
 
