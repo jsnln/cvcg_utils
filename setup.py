@@ -2,7 +2,7 @@ from setuptools import setup
   
 setup( 
     name='cvcg_utils', 
-    version='1.4', 
+    version='1.4.1', 
     description='Easy-to-use wrappers for various CV & CG tools', 
     author='Siyou Lin', 
     author_email='linsy21@mails.tsinghua.edu.cn', 
