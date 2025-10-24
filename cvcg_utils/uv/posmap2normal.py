@@ -226,7 +226,7 @@ class Img2Grad(nn.Module):
             valid_map[valid_map != 2] = 0.
             valid_map[valid_map == 2] = 1.
         
-        grad_map = (diff_map * valid_map[:, None]).sum(2)    # [B, C, 4, H, W] * [B, 1, 4, H, W] -> [B, C, 4, H, W]
+        grad_map = (diff_map * valid_map[:, None])    # [B, C, 4, H, W] * [B, 1, 4, H, W] -> [B, C, 4, H, W]
         
         return grad_map, valid_map
 
