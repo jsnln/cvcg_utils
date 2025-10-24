@@ -211,9 +211,9 @@ class Img2Grad(nn.Module):
 
         B, C, H, W = img.shape
 
-        posmap = posmap.view(-1, H, W)   # [B*C, H, W]
+        img = img.view(-1, H, W)   # [B*C, H, W]
 
-        diff_map = F.conv2d(posmap[:, None], self.diff_kernel, padding=1)    # [B*C, 4 (dx+, dy+, dx-, dy-), H, W]
+        diff_map = F.conv2d(img[:, None], self.diff_kernel, padding=1)    # [B*C, 4 (dx+, dy+, dx-, dy-), H, W]
         
         # change diff_maps from [B*C, 4, H, W] to [B, C, 4, H, W]
         diff_map = diff_map.view(B, C, 4, H, W)
