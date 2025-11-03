@@ -133,3 +133,37 @@ def raymap2KRt(rayd_list: np.ndarray, raym_list: np.ndarray, uv1_list: np.ndarra
     T = - R @ cam_center
 
     return K, R, T
+
+def refine_KRT_with_known_focal(K, R, T, focal, H, W):
+    new_K = K.copy()
+    new_K[0, 0] = focal
+    new_K[1, 1] = focal
+    new_K[0, 2] = W / 2
+    new_K[1, 2] = H / 2
+
+    cam_center = - R.T @ T
+    
+    new_R_cand = np.linalg.inv(new_K) @ K @ R
+
+    K_residual, new_R = scipy.linalg.rq(new_R_cand)
+    assert np.linalg.det(new_R) > 0
+    # NOTE QR result is not usable yet
+    # K is not usable here due to scale ambiguity
+    # R may have still a wrong orientation
+
+    # NOTE further rectify orientation
+    if K_residual[0,0] < 0:    # need to flip first row of R
+        K_residual[:, 0] *= -1
+        K_residual[0] *= -1
+
+    if K_residual[1,1] < 0:    # need to flip second row of R
+        K_residual[:, 1] *= -1
+        K_residual[1] *= -1
+    
+    if np.linalg.det(new_R) < 0:    # need to flip third row of R
+        K_residual[:, 2] *= -1
+        new_R[2] *= -1
+
+    new_T = - new_R @ cam_center
+
+    return new_K, new_R, new_T
