@@ -155,11 +155,11 @@ def refine_KRT_with_known_focal(K, R, T, focal, H, W):
     # NOTE further rectify orientation
     if K_residual[0,0] < 0:    # need to flip first row of R
         K_residual[:, 0] *= -1
-        K_residual[0] *= -1
+        new_R[0] *= -1
 
     if K_residual[1,1] < 0:    # need to flip second row of R
         K_residual[:, 1] *= -1
-        K_residual[1] *= -1
+        new_R[1] *= -1
     
     if np.linalg.det(new_R) < 0:    # need to flip third row of R
         K_residual[:, 2] *= -1
