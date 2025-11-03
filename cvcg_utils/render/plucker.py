@@ -177,7 +177,7 @@ def solve_PnP(xyz_list: np.ndarray, uv1_list: np.ndarray):
     xyz_list: [N_rays, 3]
     uv1_list: [N_rays, 3] (homogeneous)
     """
-    xyz_list_homog = np.pad(xyz_list_homog, ((0,0), (0,1)), constant_values=1)  # [N, 4]
+    xyz_list_homog = np.pad(xyz_list, ((0,0), (0,1)), constant_values=1)  # [N, 4]
     
     def matvec(P: np.ndarray):
         """
@@ -213,7 +213,7 @@ def solve_PnP(xyz_list: np.ndarray, uv1_list: np.ndarray):
 
     K_prelim_solved, R_prelim_solved = scipy.linalg.rq(vhs[:3, :3])
     RT_prelim_solved = np.linalg.inv(K_prelim_solved) @ vhs
-    assert np.linalg.det(R_prelim_solved) > 0
+    assert np.linalg.det(RT_prelim_solved[:3, :3]) > 0
     # NOTE QR result is not usable yet
     # K is not usable here due to scale ambiguity
     # R may have still a wrong orientation
