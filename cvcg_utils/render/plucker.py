@@ -136,6 +136,7 @@ def raymap2KRt(rayd_list: np.ndarray, raym_list: np.ndarray, uv1_list: np.ndarra
 
 def refine_KRT_with_known_focal(K, R, T, focal, H, W):
     new_K = K.copy()
+    new_K[0, 1] = 0
     new_K[0, 0] = focal
     new_K[1, 1] = focal
     new_K[0, 2] = W / 2
