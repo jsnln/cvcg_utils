@@ -284,8 +284,43 @@ Here :math:`B` denotes batch size, :math:`L` denotes sequence length (number of 
 Positional Embeddings
 ---------------------
 
+In this section we consider positional embedding (PE) for tokens. Suppose we have:
+
+    - a batch of tokens ``T: [..., N, D]`` and
+    - their positions ``I: [..., N, C]``.
+
+Usually,  ``I`` holds the indices for the tokens. For example, if the tokens are structured as a sequence, then ``C == 1`` and ``I[..., i] == [i]``. Or, if the tokens are image patches, then we could have ``N == H*W``, ``C == 2`` and ``I[..., i*W+j] == [i, j]``. This naturally extends to indices of higher dimensions.
+
+Applying PE can usually be formulated as injecting the positional information from ``I`` to ``T``, i.e., ``T_new = apply_PE(T, I)``, where ``T_new`` is also ``[..., N, D]``. It is desired that when tokens in ``T_new`` interact with each other, their interaction is affected by the corresponding PE. A common approach is to first obtain a PE code ``I_new = PE(I)`` of shape ``[..., N, D]``, and then add/multiply ``I_new`` to ``T`` to get ``T_new``. 
 
 
-RoPE
-^^^^
+.. code-block::
+    :caption: Pseudo-code for PE.
+
+    def indice_to_PE(I) -> I_new:
+        """
+        I: [..., N, C], C-dimensional indices of the tokens
+        
+        I_new: [..., N, D], embedded indices
+        """
+        ...
+
+    def apply_PE(T, I) -> T_new
+        """
+        T: [..., N, D], tokens
+        I: [..., N, C], C-dimensional indices of the tokens
+
+        T_new: [..., N, D], tokens with PE information
+        """
+        I_new = indices_to_PE(I)    # [..., N, D]
+        T_new = apply_PE(T, I_new)  # [..., N, D]
+
+Sinusoidal Positional Embedding
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. todo::
+    Add SPE
+
+Rotary Positional Embedding
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

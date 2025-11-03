@@ -38,6 +38,7 @@ html_static_path = ['_static']
 
 todo_include_todos = True
 
+
 autodoc_mock_imports = ['matplotlib',
                         'pytorch3d',
                         'tqdm',

@@ -41,7 +41,9 @@
    Home <self>
    getting_started
    math_test
+   tutorials/computer_vision
    tutorials/network_architectures
+   tutorials/training_tricks
    tutorials/uv_best_practice
    api_source/modules
 
