@@ -235,4 +235,4 @@ def solve_PnP(xyz_list: np.ndarray, uv1_list: np.ndarray):
     R = R_prelim_solved
     T = np.linalg.inv(K_prelim_solved) @ vhs[:3, 3]
 
-    return K, R, T
+    return K, R, T, vhs
