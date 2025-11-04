@@ -212,8 +212,7 @@ def solve_PnP(xyz_list: np.ndarray, uv1_list: np.ndarray):
         vhs = -vhs
 
     K_prelim_solved, R_prelim_solved = scipy.linalg.rq(vhs[:3, :3])
-    RT_prelim_solved = np.linalg.inv(K_prelim_solved) @ vhs
-    assert np.linalg.det(RT_prelim_solved[:3, :3]) > 0
+    assert np.linalg.det(R_prelim_solved) > 0
     # NOTE QR result is not usable yet
     # K is not usable here due to scale ambiguity
     # R may have still a wrong orientation
@@ -221,21 +220,19 @@ def solve_PnP(xyz_list: np.ndarray, uv1_list: np.ndarray):
     # NOTE step 1: further rectify orientation
     if K_prelim_solved[0,0] < 0:    # need to flip first row of R
         K_prelim_solved[:, 0] *= -1
-        RT_prelim_solved[0] *= -1
+        R_prelim_solved[0] *= -1
 
     if K_prelim_solved[1,1] < 0:    # need to flip second row of R
         K_prelim_solved[:, 1] *= -1
-        RT_prelim_solved[1] *= -1
+        R_prelim_solved[1] *= -1
     
-    if np.linalg.det(RT_prelim_solved[:3, :3]) < 0:    # need to flip third row of R
+    if np.linalg.det(R_prelim_solved[:3, :3]) < 0:    # need to flip third row of R
         K_prelim_solved[:, 2] *= -1
-        RT_prelim_solved[2] *= -1
+        R_prelim_solved[2] *= -1
 
-    # NOTE step 2: rectify scale
-    K_prelim_solved /= K_prelim_solved[2,2] # 
-    
-    K = K_prelim_solved
-    R = RT_prelim_solved[:3, :3]
-    T = RT_prelim_solved[:3, 3]
+    # NOTE step 2: rectify scale    
+    K = K_prelim_solved / K_prelim_solved[2,2]
+    R = R_prelim_solved
+    T = np.linalg.inv(K_prelim_solved) @ vhs[:3, 3]
 
     return K, R, T

@@ -505,9 +505,9 @@ class UnifiedCamera:
 
     @classmethod
     def from_lookat(cls,
-                    campos: Union[List[List[float]], np.ndarray],
-                    lookat: Union[List[List[float]], np.ndarray],
-                    up: Union[List[List[float]], np.ndarray],
+                    campos: Union[List[float], np.ndarray],
+                    lookat: Union[List[float], np.ndarray],
+                    up: Union[List[float], np.ndarray],
                     H: int,
                     W: int,
                     fov_x: float=None,
@@ -522,9 +522,9 @@ class UnifiedCamera:
         priority: front > up > right
         """
 
-        campos = np.array(campos)
-        lookat = np.array(lookat)
-        up = np.array(up)
+        campos = np.array(campos).astype(float)
+        lookat = np.array(lookat).astype(float)
+        up = np.array(up).astype(float)
         assert (3,) == campos.shape
         assert (3,) == lookat.shape
         assert (3,) == up.shape
