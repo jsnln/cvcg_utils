@@ -287,7 +287,7 @@ class DiffDRTKCamera(torch.nn.Module):
         
 
         log_rel_focal = math.log(focal / self.focal_0)
-        self.LRF = torch.nn.Parameter(torch.Tensor([log_rel_focal]).float())
+        self.LRF = torch.nn.Parameter(torch.tensor([log_rel_focal]).float())
 
         Q = matrix_to_quaternion(torch.from_numpy(R)).float()
         self.Q = torch.nn.Parameter(Q)
@@ -302,7 +302,7 @@ class DiffDRTKCamera(torch.nn.Module):
 
     def get_projection_matrices(self):
         # extrinsics
-        flip_vec_cv2gl = torch.Tensor([1., -1, -1, 1], dtype=self.Q.dtype, device=self.Q.device)
+        flip_vec_cv2gl = torch.tensor([1., -1, -1, 1], dtype=self.Q.dtype, device=self.Q.device)
         R = matrix_to_quaternion(self.Q)
         T = self.T
 
