@@ -320,6 +320,7 @@ def render_drtk_point_sprites(
         verts: torch.Tensor,
         vert_attrs: torch.Tensor,
         point_size: float,
+        make_differentiable: bool,
         allow_neg_depth: bool=False):
 
     if allow_neg_depth:
@@ -386,22 +387,21 @@ def render_drtk_point_sprites(
 
     vert_attr_img = vert_attr_img * mask[:, None]
 
-    # make_differentiable = False
-    # if make_differentiable:
-    #     vert_attr_img = drtk.edge_grad_estimator(
-    #         pts_screen,     # verts for rasterization
-    #         faces,          # faces
-    #         bary_img,       # barys
-    #         vert_attr_img, # rendered image
-    #         face_index_img)  # face indices
+    if make_differentiable:
+        vert_attr_img = drtk.edge_grad_estimator(
+            sprite_v_all,     # verts for rasterization
+            sprite_f_all,          # faces
+            bary_img,       # barys
+            vert_attr_img, # rendered image
+            face_index_img)  # face indices
         
-    #     mask = drtk.edge_grad_estimator(
-    #         pts_screen,     # verts for rasterization
-    #         faces,          # faces
-    #         bary_img,       # barys
-    #         mask.float()[:, None],  # rendered image
-    #         face_index_img, # face indices
-    #         ).squeeze(1)    # [B, H, W]
+        mask = drtk.edge_grad_estimator(
+            sprite_v_all,     # verts for rasterization
+            sprite_f_all,          # faces
+            bary_img,       # barys
+            mask.float()[:, None],  # rendered image
+            face_index_img, # face indices
+            ).squeeze(1)    # [B, H, W]
         
     if not batched:
         vert_attr_img = vert_attr_img.squeeze(0)
