@@ -3,6 +3,8 @@ import cv2
 import math
 import numpy as np
 import torch
+import torch.nn.functional as thF
+from pytorch3d.transforms import matrix_to_quaternion, quaternion_to_matrix
 
 try:
     torch.nn.Buffer
@@ -264,6 +266,116 @@ class DRTKCamera(torch.nn.Module):
         
         return pts_screen
 
+
+class DiffDRTKCamera(torch.nn.Module):
+    
+    focal_0 = 400.0
+
+    def __init__(self, focal: float, R: np.ndarray, T: np.ndarray, H, W, znear, zfar):
+        """
+        Differentiable DRTK Camera Class
+
+        For stability, it uses a different internal representation as DRTKCamera:
+
+        1. data are stored using the opencv convention
+        2. internally stores log_rel_focal (optimizable)
+        3. internally stores quaternion for w2c rotation (opencv convention)
+        4. internally stores w2c translation (opencv convention)
+
+        """
+        super().__init__()
+        
+
+        log_rel_focal = math.log(focal / self.focal_0)
+        self.LRF = torch.nn.Parameter(torch.Tensor([log_rel_focal]).float())
+
+        Q = matrix_to_quaternion(torch.from_numpy(R)).float()
+        self.Q = torch.nn.Parameter(Q)
+        
+        T = torch.from_numpy(T).float()
+        self.T = torch.nn.Parameter(T)
+
+        self.H = H
+        self.W = W
+        self.znear = znear
+        self.zfar = zfar
+
+    def get_projection_matrices(self):
+        # extrinsics
+        flip_vec_cv2gl = torch.Tensor([1., -1, -1, 1], dtype=self.Q.dtype, device=self.Q.device)
+        R = matrix_to_quaternion(self.Q)
+        T = self.T
+
+        R_pad = thF.pad(R, (0,0,0,1))           # [4, 3]
+        T_pad = thF.pad(T, (0,1), value=1)      # [4,]
+        w2c_cv = torch.cat([R_pad, T_pad[:, None]], dim=-1) # [4, 4]
+        w2c_gl = flip_vec_cv2gl[:, None] * w2c_cv
+
+        # intrinsics
+        focal_cv = torch.exp(self.LRF) * self.focal_0
+        fx_gl = 2 * focal_cv / self.W
+        fy_gl = 2 * focal_cv / self.H
+
+        # P00 = 2.0 * K[0,0] / img_w
+        # P11 = 2.0 * K[1,1] / img_h
+        P32 = -1.0
+        P22 = -(self.zfar + self.znear) / (self.zfar - self.znear)
+        P23 = -2.0 * (self.zfar * self.znear) / (self.zfar - self.znear)
+
+        proj = torch.zeros(4, 4, dtype=self.Q.dtype, device=self.Q.device)
+        proj[0, 0] = fx_gl
+        proj[1, 1] = fy_gl
+        proj[3, 2] = P32
+        proj[2, 2] = P22
+        proj[2, 3] = P23
+        
+        return proj, w2c_gl
+    
+    def get_focal_cv(self):
+        return torch.exp(self.LRF) * self.focal_0
+    
+    @torch.no_grad()
+    def get_focal_cv_no_grad(self):
+        return torch.exp(self.LRF) * self.focal_0
+
+
+    def proj_points_to_drtk_screen(self, pts: torch.Tensor, detach_z: bool):
+        """
+        pts: [B, N, 3]
+
+        out: DRTK screen space coordinates, (-0.5, -0.5) to (W-0.5, H-0.5)
+        """
+        assert len(pts.shape) == 3
+        assert pts.shape[2] == 3
+
+        proj_mat, w2c_mat = self.get_projection_matrices()
+
+        # full projection
+        pts_wld_homog = torch.nn.functional.pad(pts, (0,1), mode='constant', value=1)
+        pts_cam_homog = torch.einsum('yx,bnx->bny', w2c_mat, pts_wld_homog)
+        
+        if not detach_z:
+            pts_cam_x, pts_cam_y, pts_cam_z, _ = pts_cam_homog.unbind(dim=-1)
+            pts_clip_homog = torch.einsum('yx,bnx->bny', proj_mat,  pts_cam_homog)
+            pts_clip = pts_clip_homog[..., :3] / pts_clip_homog[..., [3]]
+        else:
+            pts_cam_x, pts_cam_y, pts_cam_z, _ = pts_cam_homog.unbind(dim=-1)
+            pts_cam_z_detached = pts_cam_z.detach()
+            pts_clip_x = -(proj_mat[0,0] * pts_cam_x / pts_cam_z_detached + proj_mat[0,2])
+            pts_clip_y = -(proj_mat[1,1] * pts_cam_y / pts_cam_z_detached + proj_mat[1,2])
+            pts_clip_z = -(proj_mat[2,2] + proj_mat[2,3] / pts_cam_z_detached)
+            pts_clip = torch.stack([pts_clip_x, pts_clip_y, pts_clip_z], dim=-1)
+
+        # clip space (OpenGL) to screen space (DRTK)
+        pts_x_screen = (pts_clip[..., 0] + 1) / 2 * self.W - 0.5
+        pts_y_screen = (1 - pts_clip[..., 1]) / 2 * self.H - 0.5
+        pts_z_screen = -pts_cam_z   # actual z coords
+
+        pts_screen = torch.stack([pts_x_screen,
+                                  pts_y_screen,
+                                  pts_z_screen], dim=-1)
+        
+        return pts_screen
 
 class BatchDRTKCamera(torch.nn.Module):
     def __init__(self, cameras: List[DRTKCamera]):

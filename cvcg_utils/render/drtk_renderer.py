@@ -2,7 +2,7 @@ import drtk
 import torch
 from typing import Callable, Union
 from ..mesh.mesh_proc import get_vert_normals, get_face_normals
-from .camera import DRTKCamera, BatchDRTKCamera
+from .camera import DRTKCamera, BatchDRTKCamera, DiffDRTKCamera
 
 def render_drtk_face_attr(
         camera: Union[DRTKCamera, BatchDRTKCamera],
@@ -316,7 +316,7 @@ def render_drtk_uv_textured(
 
 
 def render_drtk_point_sprites(
-        camera: Union[DRTKCamera, BatchDRTKCamera],
+        camera: Union[DRTKCamera, BatchDRTKCamera, DiffDRTKCamera],
         verts: torch.Tensor,
         vert_attrs: torch.Tensor,
         point_size: float,
@@ -351,7 +351,10 @@ def render_drtk_point_sprites(
     B, N, _ = pts_screen.size()
     _, _, C = vert_attrs.size()
 
-    focal_avg = (camera.K[..., 0, 0] + camera.K[..., 1, 1]) / 2 # [B,] for computing scale change of point size
+    if isinstance(camera, DRTKCamera) or isinstance(camera, BatchDRTKCamera):
+        focal_avg = (camera.K[..., 0, 0] + camera.K[..., 1, 1]) / 2 # [B,] for computing scale change of point size
+    elif isinstance(camera, DiffDRTKCamera):
+        focal_avg = camera.get_focal_cv()
 
     point_size_screen = torch.ones(pts_screen.shape[:2], dtype=pts_screen.dtype, device=pts_screen.device) * point_size # [B, N]
     point_size_screen = point_size_screen / pts_screen[..., 2] * focal_avg # [B, N]
