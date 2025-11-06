@@ -337,7 +337,10 @@ class DiffDRTKCamera(torch.nn.Module):
     @torch.no_grad()
     def get_focal_cv_no_grad(self):
         return torch.exp(self.LRF) * self.focal_0
-
+    
+    @torch.no_grad()
+    def clamp_internal_vals_(self):
+        self.Q = torch.nn.functional.normalize(self.Q)
 
     def proj_points_to_drtk_screen(self, pts: torch.Tensor, detach_z: bool):
         """
