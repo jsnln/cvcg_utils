@@ -387,7 +387,6 @@ def render_drtk_point_sprites(
     depth_img, bary_img = drtk.render(sprite_v_all, sprite_f_all, face_index_img)    # [B, 3, H, W]
     vert_attr_img = drtk.interpolate(sprite_attr_all, sprite_f_all, face_index_img, bary_img)   # [B, C, H, W]
     
-
     vert_attr_img = vert_attr_img * mask[:, None]
 
     if make_differentiable:
