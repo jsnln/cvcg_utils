@@ -353,7 +353,7 @@ class DiffDRTKCamera(torch.nn.Module):
         # full projection
         pts_wld_homog = torch.nn.functional.pad(pts, (0,1), mode='constant', value=1)
         pts_cam_homog = torch.einsum('yx,bnx->bny', w2c_mat, pts_wld_homog)
-        
+
         if not detach_z:
             pts_cam_x, pts_cam_y, pts_cam_z, _ = pts_cam_homog.unbind(dim=-1)
             pts_clip_homog = torch.einsum('yx,bnx->bny', proj_mat,  pts_cam_homog)
