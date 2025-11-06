@@ -303,7 +303,7 @@ class DiffDRTKCamera(torch.nn.Module):
     def get_projection_matrices(self):
         # extrinsics
         flip_vec_cv2gl = torch.tensor([1., -1, -1, 1], dtype=self.Q.dtype, device=self.Q.device)
-        R = matrix_to_quaternion(self.Q)
+        R = quaternion_to_matrix(self.Q)
         T = self.T
 
         R_pad = thF.pad(R, (0,0,0,1))           # [4, 3]
