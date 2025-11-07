@@ -110,11 +110,13 @@ def render_drtk_vert_attr(
         if len(vert_attrs.shape) == 2:
             vert_attrs = vert_attrs[None].expand(camera.batch_size, -1, -1)
 
-    elif isinstance(camera, DRTKCamera):        # if `camera` is unbatched, then `verts` can be batched
+    elif isinstance(camera, DRTKCamera) or isinstance(camera, DiffDRTKCamera):        # if `camera` is unbatched, then `verts` can be batched
         if len(verts.shape) == 2:
             batched = False
             verts = verts[None]
             vert_attrs = vert_attrs[None]
+    else:
+        raise NotImplementedError
 
 
     assert len(faces.shape) == 2
