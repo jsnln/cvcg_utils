@@ -331,6 +331,17 @@ class DiffDRTKCamera(torch.nn.Module):
         
         return proj, w2c_gl
     
+    @torch.no_grad()
+    def get_opencv_matrices_no_grad(self):
+        K = np.eye(3)
+        K[0, 0] = self.get_focal_cv_no_grad()
+        K[1, 1] = self.get_focal_cv_no_grad()
+        K[0, 2] = self.W / 2
+        K[1, 2] = self.H / 2
+        R = quaternion_to_matrix(self.Q).cpu().numpy().astype(float)
+        T = self.T.cpu().numpy().astype(float)
+        return K, R, T
+
     def get_focal_cv(self):
         return torch.exp(self.LRF) * self.focal_0
     
