@@ -124,7 +124,7 @@ def get_voxel_visualization(voxel_centers, side_length):
                             [8, 4, 3],
                             [8, 3, 7],
                             [8, 6, 2],
-                            [8, 2, 4]]) - 1 # [12, 3]
+                            [8, 2, 4]])[:, [0,2,1]] - 1 # [12, 3]
 
     all_voxel_corners = voxel_centers[:, None] + side_length * corners[None]  # [N, 1, 3] + [1, 8, 3] => [N, 8, 3]
     
