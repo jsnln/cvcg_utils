@@ -104,7 +104,7 @@ def gen_camera_set_visualization(K_list: List[np.ndarray], c2w_list: List[np.nda
     
     return verts_all, faces_all, v_colors
 
-def get_voxel_visualization(voxel_centers, side_length):
+def get_voxel_visualization(voxel_centers, side_length, voxel_colors=None):
     corners = np.array([[0, 0, 0],
                         [0, 0, 1],
                         [0, 1, 0],
@@ -125,10 +125,13 @@ def get_voxel_visualization(voxel_centers, side_length):
                             [8, 3, 7],
                             [8, 6, 2],
                             [8, 2, 4]])[:, [0,2,1]] - 1 # [12, 3]
+    
+    if voxel_colors is not None:
+        voxel_colors = np.broadcast_to(voxel_colors[:, None], (voxel_colors.shape[0], 8, voxel_colors.shape[1])).reshape(voxel_colors.shape[0]*8, -1)
 
     all_voxel_corners = voxel_centers[:, None] + side_length * corners[None]  # [N, 1, 3] + [1, 8, 3] => [N, 8, 3]
     
     vid_offsets = np.arange(voxel_centers.shape[0]) * 8         # [N,]
     all_voxel_faces = voxel_faces[None] + vid_offsets[:, None, None]    # [1, 12, 3] + [N, 1, 1] => [N, 12, 3]
 
-    return all_voxel_corners.reshape(-1, 3), all_voxel_faces.reshape(-1, 3)
+    return all_voxel_corners.reshape(-1, 3), all_voxel_faces.reshape(-1, 3), voxel_colors.copy()
