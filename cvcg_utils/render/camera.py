@@ -677,40 +677,63 @@ class UnifiedCamera:
 
         # intrinsics
         if K is None:
-            assert fov_mode in ['deg', 'rad'], f'param fov_mode must be either deg or rad, now it is {fov_mode}'
-            if (fov_x is None) and (fov_y is None):
-                raise NotImplementedError("Proivde either (fov_x, fov_y) or K")
-            elif fov_y is None:
-                if fov_mode == 'deg':
-                    fov_x = fov_x / 180 * math.pi
-                f_x = W / (2 * math.tan(fov_x / 2))
-                f_y = f_x
-
-            elif fov_x is None:
-                if fov_mode == 'deg':
-                    fov_y = fov_y / 180 * math.pi
-                f_y = H / (2 * math.tan(fov_y / 2))
-                f_x = f_y
-            
-            else:
-                if fov_mode == 'deg':
-                    fov_x = fov_x / 180 * math.pi
-                    fov_y = fov_y / 180 * math.pi
-                f_x = W / (2 * math.tan(fov_x / 2))
-                f_y = H / (2 * math.tan(fov_y / 2))
-            
-            c_x = W / 2
-            c_y = H / 2
-
-            K = np.eye(3)
-            K[0,0] = f_x
-            K[1,1] = f_y
-            K[0,2] = c_x
-            K[1,2] = c_y
+            K = K_from_fov(fov_x, fov_y, fov_mode, H, W)
         else:
             pass    # leaving K as is
 
         return cls(K, R, T, H, W, name)
+    
+    @classmethod
+    def from_yaw_pitch_radius_fov(cls,
+                    yaw: float,
+                    pitch: float,
+                    radius: float,
+                    fov_x: float,
+                    fov_y: float,
+                    H: int,
+                    W: int,
+                    angle_mode: str) -> Self:
+        """
+        generates a camera looking at the origin whose position is defined by yaw, pitch and radius
+        
+        +z is up
+        """
+        assert angle_mode in ['deg', 'rad']
+
+        if angle_mode == 'deg':
+            yaw = yaw / 180 * np.pi
+            pitch = pitch / 180 * np.pi
+
+        campos = np.array([
+            np.sin(yaw) * np.cos(pitch),
+            np.cos(yaw) * np.cos(pitch),
+            np.sin(pitch),
+        ]) * radius
+        lookat = np.array([0., 0., 0.]).astype(float)
+        up = np.array([0, 0, 1]).astype(float)
+
+        
+        # camera pose
+        front = lookat - campos
+        front /= np.linalg.norm(front).clip(min=1e-8)
+        up = up - (up @ front) * front
+        down = - up / np.linalg.norm(up).clip(min=1e-8)
+        right = np.linalg.cross(down, front)
+
+        c2w = np.eye(4)
+        c2w[:3, 0] = right
+        c2w[:3, 1] = down
+        c2w[:3, 2] = front
+        c2w[:3, 3] = campos
+
+        w2c = np.linalg.inv(c2w)
+        R = w2c[:3, :3]
+        T = w2c[:3, 3]
+
+        # intrinsics
+        K = K_from_fov(fov_x, fov_y, angle_mode, H, W)
+
+        return cls(K, R, T, H, W, None)
 
     @classmethod
     def from_intr_extr(cls, intr_mat_3x3, extr_mat_3x4, h, w, name=None) -> Self:
