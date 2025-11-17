@@ -134,7 +134,7 @@ def make_gs_rasterizer(camera: GSCamera, bg_color, scaling_modifier=1.0, active_
         viewmatrix=camera.world_view_transform.clone().float().cuda(),
         projmatrix=camera.full_proj_transform.clone().float().cuda(),
         sh_degree=active_sh_degree,
-        campos=camera.camera_center.clone().float().cuda(),
+        campos=camera.campos.clone().float().cuda(),
         prefiltered=False,
         debug=debug,
     )
