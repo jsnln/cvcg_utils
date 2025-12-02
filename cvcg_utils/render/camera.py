@@ -35,7 +35,7 @@ def K_from_fov(fov_x, fov_y, fov_mode, H, W):
             fov_y = fov_y / 180 * math.pi
         f_x = W / (2 * math.tan(fov_x / 2))
         f_y = H / (2 * math.tan(fov_y / 2))
-    
+
     c_x = W / 2
     c_y = H / 2
 
