@@ -42,6 +42,7 @@
    getting_started
    math_test
    tutorials/computer_vision
+   tutorials/generative_models
    tutorials/network_architectures
    tutorials/training_tricks
    tutorials/uv_best_practice
