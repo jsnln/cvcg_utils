@@ -67,16 +67,18 @@ Supposably, :math:`p_{0,t}(x(t)|x(0))` is Gaussian when :math:`f(x,t)` is affine
 Forward Processes
 -----------------
 
-Langevin Dynamics (LD)
-^^^^^^^^^^^^^^^^^^^^^^
+Score Matching with Langevin Dynamics (SMLD)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-For LD, the forward process is given by
+For SMLD, the forward process is given by
 
 .. math::
 
-    p_{\sigma_t}(x(t)|x(0))=\mathcal N(x(0),\sigma_t^2I)\iff x(t)=x(0)+\sigma_tz,\ z\sim\mathcal N(0,I).
+    p_{\sigma_t}(x(t)|x(0))=\mathcal N(x(0),\sigma_t^2I)
+    
+    \iff x(t)=x(0)+\sigma_tz,\ z\sim\mathcal N(0,I).
 
-Here, :math:`\sigma_t` is monotonically increasing in :math:`t`. Consider discrete time steps :math:`t_0=0<t_1<t_2<\cdots<t_N` (for simplicity we define :math:`\sigma_{t_0}=0`). Then the discrete forward process is
+Here, :math:`\sigma_t` is monotonically increasing in :math:`t`. Consider discrete time steps :math:`0=t_0<t_1<t_2<\cdots<t_N` (for simplicity we define :math:`\sigma_{t_0}=0`). Then the discrete forward process is
 
 .. math::
 
@@ -107,8 +109,54 @@ Taking the limit :math:`t_i\to t_{i-1}` and noting that :math:`{\rm d}w=\sqrt{{\
 Denoising Diffusion Probabilistic Models (DDPM)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-For DDPM, the forward process is defined as 
+For DDPM, the forward process is defined as
 
+.. math::
+
+    p_{\alpha_t}(x(t)|x(0))=\mathcal N(\sqrt{\alpha_t}x(0),(1-\alpha_t)I)
+    
+    \iff x(t)=\sqrt{\alpha_t}x(0)+\sqrt{1-\alpha_t}z,\ z\sim\mathcal N(0,I).
+
+Again, let :math:`0=t_0<t_1<t_2<\cdots<t_N` and :math:`\alpha_0=1`. Then the discrete form is
+
+.. math::
+
+    x_{t_i}=\sqrt{\alpha_{t_i}}x_{t_0}+\sqrt{1-\alpha_{t_i}}z,\ z\sim\mathcal N(0,I).
+
+The equivalent incremental form is
+
+.. math::
+
+    x_{t_i}=\sqrt{1-\beta_{t_i}}x_{t_{i-1}}+\sqrt{\beta_{t_i}}z,\ z\sim\mathcal N(0,I),
+
+where :math:`\beta_{t_i}\in(0,1)` are noise scales such that :math:`\alpha_{t_i}=\prod_{j=1}^i(1-\beta_{t_j})`. Similar to SMLD, we have
+
+.. math::
+
+    \frac{x_{t_i}-x_{t_{i-1}}}{t_i-t_{i-1}}\approx-\frac{\beta_{t_i}}{2(t_i-t_{i-1})}x_{t_{i-1}}+\sqrt{\frac{\beta_{t_i}}{t_i-t_{i_1}}}\frac{z}{\sqrt{t_i-t_{i_1}}},\ z\sim\mathcal N(0,I),
 .. rubric:: References
 
-.. [Anderson1982] Brian D. O. Anderson. *Reverse-time diffusion equation models*. Stochastic Processes and their Applications, 12(3):313326, May 1982.
+Note that as :math:`t_i\to t_{i-1}`, we also have :math:`\beta_{t_i}\to0`. So we need to define :math:`\beta(t_{i-1})=\lim_{t_i\to t_{i-1}}\beta_{t_i}/(t_i-t_{i-1})`. In this way, the continuous version of DDPM is
+
+.. math::
+
+    {\rm d}x=-\frac{\beta(t)}{2}x{\rm d}t+\sqrt{\beta(t)}{\rm d}w.
+
+Flow Matching (FM)
+^^^^^^^^^^^^^^^^^^
+
+FM itself is a continous model defined by
+
+.. math::
+
+    x(t)=(1-t)x(0)+tz,\ z\sim\mathcal N(0,I),
+
+which gives
+
+.. math::
+
+    p_t(x(t)|x(0))=\mathcal N((1-t)x(0),t^2I).
+
+
+.. [Anderson1982] Brian D. O. Anderson. *Reverse-time diffusion equation models*. Stochastic Processes and their Applications, 12(3):313-326, May 1982.
+
