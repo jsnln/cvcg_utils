@@ -264,3 +264,106 @@ def write_depth_compressed_dr_png(
     if unit is not None:
         pnginfo.add_text('unit', str(unit))
     pil_image.save(path, pnginfo=pnginfo, compress_level=compression_level)
+
+def read_rgb_compressed_flat_dr_png(path: Union[str, os.PathLike, IO], read_nan_as: float = 0.0) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    This is used to read images written with write_rgb_compressed_dr_png
+    """
+    if isinstance(path, (str, os.PathLike)):
+        data = Path(path).read_bytes()
+    else:
+        data = path.read()
+    pil_image = PIL.Image.open(io.BytesIO(data))
+    R_low = float(pil_image.info.get('R_low'))
+    G_low = float(pil_image.info.get('G_low'))
+    B_low = float(pil_image.info.get('B_low'))
+    R_high = float(pil_image.info.get('R_high'))
+    G_high = float(pil_image.info.get('G_high'))
+    B_high = float(pil_image.info.get('B_high'))
+    
+    data = np.array(pil_image)
+    
+    H, W_flat = data.shape
+    assert W_flat % 3 == 0
+    W = W_flat // 3
+    data = data.reshape(H, 3, W)
+    mask = (data[:, 0] > 0) & (data[:, 0] < 65535)
+
+    data = (data.astype(np.float32) - 1) / 65533
+    R = data[:, 0] * (R_high - R_low) + R_low
+    G = data[:, 1] * (G_high - G_low) + G_low
+    B = data[:, 2] * (B_high - B_low) + B_low
+
+    data_metric = np.stack([R, G, B], axis=-1)
+    data_metric[~mask] = read_nan_as
+    return data_metric, mask
+
+def write_rgb_compressed_flat_dr_png(
+    path: Union[str, os.PathLike, IO], 
+    data: np.ndarray,
+    mask: np.ndarray = None,
+    compression_level: int = 7,
+):
+    """
+    This is taken from https://github.com/microsoft/MoGe/blob/main/moge/utils/io.py#L110
+
+    This depth will be dynamically scaled to 1 ~ 65534 and converted to uint16 png format.
+
+    Encode and write a float image as 16-bit PNG format
+
+    Range is computed channel-wise.
+
+    BG pixels will be converted to nan for compression
+
+    ### Parameters:
+    - `path: Union[str, os.PathLike, IO]`
+        The file path or file object to write to.
+    - `depth: np.ndarray`
+        The depth array, float32 array of shape (H, W). 
+        May contain `NaN` for invalid values and `Inf` for infinite values.
+    - `unit: float = None`
+        The unit of the depth values.
+    
+    Depth values are encoded as follows:
+    - 0: unknown
+    - 1 ~ 65534: depth values in logarithmic
+    - 65535: infinity
+    
+    metadata is stored in the PNG file as text fields:
+    - `near`: the minimum depth value
+    - `far`: the maximum depth value
+    - `unit`: the unit of the depth values (optional)
+    """
+    assert len(data.shape) == 3 # must be [H, W, 3]
+    assert data.shape[2] == 3   # must be RGB
+
+    H, W, _ = data.shape
+    data = data.astype(np.float32)
+
+    if mask is None:
+        mask = np.ones((H, W), dtype=bool)
+
+    R_low, R_high = data[mask, 0].min().item(), data[mask, 0].max().item()
+    G_low, G_high = data[mask, 1].min().item(), data[mask, 1].max().item()
+    B_low, B_high = data[mask, 2].min().item(), data[mask, 2].max().item()
+    
+    R_scaled = 1 + np.round(((data[..., 0] - R_low) / (R_high - R_low)).clip(0, 1) * 65533).astype(np.uint16) # 1~65534
+    G_scaled = 1 + np.round(((data[..., 1] - G_low) / (G_high - G_low)).clip(0, 1) * 65533).astype(np.uint16) # 1~65534
+    B_scaled = 1 + np.round(((data[..., 2] - B_low) / (B_high - B_low)).clip(0, 1) * 65533).astype(np.uint16) # 1~65534
+    data_scaled = np.stack([R_scaled, G_scaled, B_scaled], axis=-1)     # [H, W, 3]
+
+    data_scaled[~mask] = 0
+    # reserving 65535 for something else?
+
+    data_scaled_flat = data_scaled.swapaxes(1, 2).reshape(H, 3*W)
+
+    pil_image = PIL.Image.fromarray(data_scaled_flat)
+    pnginfo = PIL.PngImagePlugin.PngInfo()
+    pnginfo.add_text('R_low', str(R_low))
+    pnginfo.add_text('G_low', str(G_low))
+    pnginfo.add_text('B_low', str(B_low))
+    pnginfo.add_text('R_high', str(R_high))
+    pnginfo.add_text('G_high', str(G_high))
+    pnginfo.add_text('B_high', str(B_high))
+    pil_image.save(path, pnginfo=pnginfo, compress_level=compression_level)
+
