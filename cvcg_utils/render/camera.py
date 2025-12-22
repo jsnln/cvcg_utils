@@ -342,6 +342,12 @@ class DiffDRTKCamera(torch.nn.Module):
         T = self.T.cpu().numpy().astype(float)
         return K, R, T
 
+    @torch.no_grad()
+    def get_campos_no_grad(self):
+        R = quaternion_to_matrix(self.Q)
+        T = self.T
+        return - R.t() @ T
+
     def get_focal_cv(self):
         return torch.exp(self.LRF) * self.focal_0
     
