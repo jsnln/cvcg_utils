@@ -4,6 +4,7 @@ from typing import Callable, Union
 from ..mesh.mesh_proc import get_vert_normals, get_face_normals
 from .camera import DRTKCamera, BatchDRTKCamera, DiffDRTKCamera
 
+
 def render_drtk_face_attr(
         camera: Union[DRTKCamera, BatchDRTKCamera],
         verts: torch.Tensor,
@@ -30,7 +31,7 @@ def render_drtk_face_attr(
     if isinstance(camera, BatchDRTKCamera):     # if `camera` is batched, then either `verts` is unbatched or has the same batch size
         assert len(verts.shape) == 2 or \
               (len(verts.shape) == 3 and verts.shape[0] == camera.batch_size)
-    elif isinstance(camera, DRTKCamera):        # if `camera` is unbatched, then `verts` can be batched
+    elif isinstance(camera, DRTKCamera) or isinstance(camera, DiffDRTKCamera):        # if `camera` is unbatched, then `verts` can be batched
         if len(verts.shape) == 2:
             batched = False
             verts = verts[None]
