@@ -57,8 +57,8 @@ def cotangent_weights(verts_rest: torch.Tensor, faces: torch.Tensor, eps: float 
 
 def arap_loss(verts: torch.Tensor,
               verts_rest: torch.Tensor,
-              faces: torch.Tensor,
-              eps: float = 1e-9,
+              edge_ij: torch.Tensor,
+              w_ij: torch.Tensor,
               return_rotations: bool = False):
     """
     ARAP loss for a single mesh.
@@ -66,7 +66,8 @@ def arap_loss(verts: torch.Tensor,
     Args:
       verts:      [Nv,3] deformed
       verts_rest: [Nv,3] rest/reference
-      faces:      [Nf,3] long
+      edge_ij:    Please use `cotangent_weights` to acquire it
+      w_ij:       Please use `cotangent_weights` to acquire it
     Returns:
       loss: scalar tensor
       (optional) R: [Nv,3,3] per-vertex rotations
@@ -74,7 +75,7 @@ def arap_loss(verts: torch.Tensor,
     device, dtype = verts.device, verts.dtype
     Nv = verts.shape[0]
 
-    edge_ij, w_ij = cotangent_weights(verts_rest, faces, eps=eps)  # undirected i<j
+    
     ii, jj = edge_ij[0], edge_ij[1]  # [E]
 
     # Build directed edges so we can sum over neighbors per vertex i
