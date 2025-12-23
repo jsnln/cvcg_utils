@@ -137,6 +137,10 @@ class DRTKCamera(torch.nn.Module):
         self.znear = znear
         self.zfar = zfar
 
+    @torch.no_grad()
+    def get_campos_no_grad(self):
+        return torch.linalg.inv(self.w2c_mat)[:3, 3]
+
     def proj_points_to_camera(self, pts: torch.Tensor):
         """
         pts: [B, N, 3]
@@ -155,7 +159,6 @@ class DRTKCamera(torch.nn.Module):
 
         return pts_cam
 
-    
     def unproj_depth_image(self, depth_img: torch.Tensor):
         """
         depth_img: [B, H, W]

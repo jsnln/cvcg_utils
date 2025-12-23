@@ -46,7 +46,7 @@ optimizer = torch.optim.Adam([verts_deformed], lr=1e-3)
 bar = tqdm(range(5000))
 for iter in bar:
 
-    loss_arap, R = arap_loss(verts_deformed, verts_rest, edge_ij, w_ij, return_rotations=True)
+    loss_arap, R = arap_loss(verts_deformed, verts_rest, edge_ij, torch.ones_like(w_ij), return_rotations=True)
     loss_tgt = torch.nn.functional.mse_loss(verts_deformed[:8], corner_targets)
     loss = loss_arap * 0.1 + loss_tgt
     # loss = loss_arap
