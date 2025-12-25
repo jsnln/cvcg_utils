@@ -5,6 +5,62 @@ from ..mesh.mesh_proc import get_vert_normals, get_face_normals
 from .camera import DRTKCamera, BatchDRTKCamera, DiffDRTKCamera
 
 
+def render_drtk_depth(
+        camera: Union[DRTKCamera, BatchDRTKCamera],
+        verts: torch.Tensor,
+        faces: torch.Tensor,
+        make_differentiable=False):
+    
+    """
+    only renders depth
+    
+    supports two batching modes: camera batching and vert batching
+
+    the function uses `isinstance(camera, DRTKCamera)` to determine which batching type to use
+
+    only one of `camera` and `verts` is allowed to be batched
+
+    camera: unbatched type DRTKCamera or batched type BatchDRTKCamera
+    verts: unbatched [Nv, 3], or batched [B, Nv, 3]
+    faces: unbatched [Nf, 3], shared by items in the vertex batch
+    bg_attr: [C], shared by items in the vertex batch
+    """
+    # determine batching mode
+    batched = True      # whether at least one of `camera` or `verts` is batched
+    if isinstance(camera, BatchDRTKCamera):     # if `camera` is batched, then either `verts` is unbatched or has the same batch size
+        assert len(verts.shape) == 2 or \
+              (len(verts.shape) == 3 and verts.shape[0] == camera.batch_size)
+    elif isinstance(camera, DRTKCamera) or isinstance(camera, DiffDRTKCamera):        # if `camera` is unbatched, then `verts` can be batched
+        if len(verts.shape) == 2:
+            batched = False
+            verts = verts[None]
+    assert len(faces.shape) == 2
+
+    pts_screen = camera.proj_points_to_drtk_screen(verts, detach_z=False)  # [B, N, 3]
+
+    face_index_img = drtk.rasterize(pts_screen, faces, height=camera.H, width=camera.W)   # [B, H, W]
+    mask = (face_index_img > -1)  # [B, H, W]
+    depth_img, bary_img = drtk.render(pts_screen, faces, face_index_img)    # [B, 3, H, W]
+    
+
+    if make_differentiable:
+        assert not make_differentiable, "Should depth be edge-differentiable? I don't know"
+        # mask = drtk.edge_grad_estimator(
+        #     pts_screen,     # verts for rasterization
+        #     faces,          # faces
+        #     bary_img,       # barys
+        #     mask.float()[:, None],  # rendered image
+        #     face_index_img, # face indices
+        #     ).squeeze(1)    # [B, H, W]
+
+    if not batched:
+        depth_img = depth_img.squeeze(0)
+        mask = mask.squeeze(0)
+        face_index_img = face_index_img.squeeze(0)
+
+    return depth_img, mask, face_index_img
+
+
 def render_drtk_face_attr(
         camera: Union[DRTKCamera, BatchDRTKCamera],
         verts: torch.Tensor,
