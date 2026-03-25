@@ -71,6 +71,12 @@ This is simple. Just do
     ... # do stuff with your new venv
     deactivate  # deactivate
 
+Also remember to install pip for this environment
+
+.. code-block:: bash
+
+    uv pip install pip
+
 .. todo::
 
     It appears we still have to install Python interpreters, environments and packages on each cluster individually. Check if there is an easier way to clone environments across NAS (UV not using standalone environments is the main problem here). Maybe ``uv sync`` will help?
