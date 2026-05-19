@@ -1,7 +1,4 @@
 import numpy as np
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import cv2
 from scipy.spatial import Delaunay
 
