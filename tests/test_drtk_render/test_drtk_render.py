@@ -44,7 +44,7 @@ face_normal_img[~mask] = 0
 write_rgb('test_drtk_face_attr_render.png', face_normal_img.byte().cpu().numpy())
 
 # ====== EXAMPLE 4: point sprite render ======
-point_img, depth, mask, face_index_img = render_drtk_point_sprites(drtk_camera, mesh_verts, vert_normals, point_size=0.01)
+point_img, depth, mask, face_index_img = render_drtk_point_sprites(drtk_camera, mesh_verts, vert_normals, point_size=0.01, make_differentiable=False)
 point_img = point_img.permute(1,2,0)
 point_img = (((point_img + 1) / 2).clamp(0,1) * 255)
 point_img[~mask] = 0
