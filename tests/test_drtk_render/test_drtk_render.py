@@ -19,7 +19,8 @@ uni_camera = UnifiedCamera.from_lookat(
     np.array([0., 2., 2.]),
     np.array([0., 0,  0.]),
     np.array([0., 1., 0]),
-    60, 60, 'deg', None, 512, 512)
+    512, 512,
+    60, 60, 'deg', None)
 drtk_camera = uni_camera.to_drtk_format().float().cuda()
 
 textured_render_img, depth, mask, face_index_img = render_drtk_uv_textured(drtk_camera, mesh_verts, mesh_faces, mesh_uv_verts, mesh_uv_faces, texture_img, make_differentiable=False, flip_v=True)
