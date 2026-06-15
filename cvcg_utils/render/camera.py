@@ -4,7 +4,6 @@ import math
 import numpy as np
 import torch
 import torch.nn.functional as thF
-from pytorch3d.transforms import matrix_to_quaternion, quaternion_to_matrix
 
 try:
     torch.nn.Buffer
@@ -287,6 +286,7 @@ class DiffDRTKCamera(torch.nn.Module):
 
         """
         super().__init__()
+        from pytorch3d.transforms import matrix_to_quaternion
         
 
         log_rel_focal = math.log(focal / self.focal_0)
@@ -304,6 +304,8 @@ class DiffDRTKCamera(torch.nn.Module):
         self.zfar = zfar
 
     def get_projection_matrices(self):
+        from pytorch3d.transforms import quaternion_to_matrix
+
         # extrinsics
         flip_vec_cv2gl = torch.tensor([1., -1, -1, 1], dtype=self.Q.dtype, device=self.Q.device)
         R = quaternion_to_matrix(self.Q)
@@ -672,7 +674,7 @@ class UnifiedCamera:
         front /= np.linalg.norm(front).clip(min=1e-8)
         up = up - (up @ front) * front
         down = - up / np.linalg.norm(up).clip(min=1e-8)
-        right = np.linalg.cross(down, front)
+        right = np.cross(down, front)
 
         c2w = np.eye(4)
         c2w[:3, 0] = right
@@ -727,7 +729,7 @@ class UnifiedCamera:
         front /= np.linalg.norm(front).clip(min=1e-8)
         up = up - (up @ front) * front
         down = - up / np.linalg.norm(up).clip(min=1e-8)
-        right = np.linalg.cross(down, front)
+        right = np.cross(down, front)
 
         c2w = np.eye(4)
         c2w[:3, 0] = right
