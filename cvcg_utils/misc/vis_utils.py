@@ -10,7 +10,7 @@ def gen_line_visualization(start: np.ndarray, end: np.ndarray):
     v1 = np.array(start)
     v2 = np.array(end)
     v1_e = v1.copy()
-    normal = np.linalg.cross(v2 - v1, np.random.randn(3))
+    normal = np.cross(v2 - v1, np.random.randn(3))
     normal /= np.linalg.norm(normal).clip(1e-6)
     v1_e += normal * eps
 

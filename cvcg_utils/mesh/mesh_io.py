@@ -5,7 +5,7 @@ import plyfile
 import pygltflib
 import numpy as np
 from dataclasses import dataclass
-from ..misc.image import write_rgb
+from cvcg_utils.image import write_rgb
 
 @dataclass
 class MeshData:

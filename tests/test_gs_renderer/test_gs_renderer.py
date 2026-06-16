@@ -3,7 +3,7 @@ import torch
 from cvcg_utils.mesh.gaussian_io import load_ply
 from cvcg_utils.render.camera import UnifiedCamera
 from cvcg_utils.render.gs_renderer import render_gs
-from cvcg_utils.misc.image import write_rgb
+from cvcg_utils.image import write_rgb
 
 uni_cam = UnifiedCamera.from_lookat(
     center=np.array([0, 0, 0]),

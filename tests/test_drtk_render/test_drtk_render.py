@@ -4,7 +4,7 @@ from cvcg_utils.render.camera import UnifiedCamera, DRTKCamera
 from cvcg_utils.render.drtk_renderer import render_drtk_face_attr, render_drtk_vert_attr, render_drtk_uv_textured, render_drtk_point_sprites
 from cvcg_utils.mesh import read_obj
 from cvcg_utils.mesh.mesh_proc import get_vert_normals, get_face_normals
-from cvcg_utils.misc.image import read_rgb, write_rgb
+from cvcg_utils.image import read_rgb, write_rgb
 from cvcg_utils.misc.tensor_utils import np2cuda, th2np
 
 mesh = read_obj('../test_mesh_io/bunny_with_texture.obj')
